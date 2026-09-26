@@ -6,20 +6,20 @@
   color-scheme: dark;
   --temple-cherry: #9d2235;
   --temple-cherry-dark: #741727;
-  --ink: #15171d;
-  --panel: #ffffff;
-  --muted: #687182;
-  --line: #d9dee7;
-  --soft: #f4f6f9;
-  --error: #b42318;
-  --success: #067647;
+  --ink: #eceef2;
+  --panel: #14161b;
+  --muted: #98a1b3;
+  --line: #2b303b;
+  --soft: #1b1e25;
+  --error: #ff8a80;
+  --success: #5fd99a;
 }
 
 body {
   min-height: 100vh;
   margin: 0;
   overflow: hidden;
-  background: #111318;
+  background: #08090c;
   color: #f7f8fa;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -97,11 +97,21 @@ input {
   border-color: #ffffff;
 }
 
-.map-shell,
+.map-shell {
+  display: block;
+  width: 500px;
+  height: 500px;
+  margin: 20px auto;
+  margin-top: 150px;
+}
+
 gmp-map {
   display: block;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 420px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 20%);
 }
 
 .location-panel {
@@ -158,7 +168,7 @@ gmp-map {
   place-items: center;
   padding: 22px;
   background:
-    linear-gradient(180deg, rgb(14 16 20 / 74%), rgb(14 16 20 / 88%)),
+    linear-gradient(180deg, rgb(4 5 8 / 82%), rgb(4 5 8 / 94%)),
     radial-gradient(circle at 30% 20%, rgb(157 34 53 / 22%), transparent 35%);
 }
 
@@ -203,7 +213,7 @@ gmp-map {
 }
 
 .auth-form label {
-  color: #29303b;
+  color: #c9cfdb;
   font-size: 0.9rem;
   font-weight: 800;
 }
@@ -214,7 +224,7 @@ gmp-map {
   padding: 0 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--soft);
   color: var(--ink);
   outline: none;
 }
@@ -279,7 +289,7 @@ gmp-map {
   margin-bottom: 16px;
   padding: 12px 14px;
   border-radius: 8px;
-  background: #fef3f2;
+  background: rgb(255 138 128 / 12%);
   color: var(--error);
   font-size: 0.92rem;
   font-weight: 700;
@@ -287,7 +297,7 @@ gmp-map {
 }
 
 .auth-message.success {
-  background: #ecfdf3;
+  background: rgb(95 217 154 / 12%);
   color: var(--success);
 }
 
