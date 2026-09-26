@@ -38,6 +38,10 @@
       color-scheme="DARK"
     >
     </gmp-map>
+    <div class="location-controls">
+      <button id="locationButton" class="primary-button" type="button">Use my location</button>
+      <p id="demo" class="field-hint" aria-live="polite"></p>
+    </div>
   </main>
 
   <div id="authOverlay" class="auth-overlay" role="dialog" aria-modal="true" aria-labelledby="authTitle">
@@ -106,5 +110,62 @@
   src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBx1piCOFQYkBt1I2qn-ghUuLRu2QXQhm8&libraries=maps&v=weekly"
   defer
 ></script>
+
+<script>
+  const x = document.getElementById("demo");
+
+  const locationButton = document.getElementById("locationButton");
+  let watchId = null;
+
+  function getLocation() {
+    if (watchId !== null) {
+      stopTracking();
+      return;
+    }
+    if (navigator.geolocation) {
+      x.textContent = "Requesting location...";
+      watchId = navigator.geolocation.watchPosition(success, error, {
+        enableHighAccuracy: true,
+        maximumAge: 5000
+      });
+      locationButton.textContent = "Stop tracking";
+    } else {
+      x.textContent = "Geolocation is not supported by this browser";
+    }
+  }
+
+  function stopTracking() {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    locationButton.textContent = "Use my location";
+    x.textContent = "Location tracking stopped.";
+  }
+
+  function success(position) {
+    const lat = position.coords.latitude;
+    const lng = position.coords.longitude;
+    x.textContent = "Latitude: " + lat.toFixed(5) + ", Longitude: " + lng.toFixed(5);
+
+    const map = document.querySelector("gmp-map");
+    if (map) {
+      map.center = { lat: lat, lng: lng };
+      map.zoom = 16;
+    }
+  }
+
+  function error(err) {
+    if (err.code === err.PERMISSION_DENIED) {
+      x.textContent = "Location permission was denied.";
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      locationButton.textContent = "Use my location";
+    } else {
+      x.textContent = "Sorry, no position available.";
+    }
+  }
+
+  locationButton.addEventListener("click", getLocation);
+</script>
+
 </body>
 </html>
