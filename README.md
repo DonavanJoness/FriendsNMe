@@ -12,3 +12,4 @@ UI- how the map will be set up basically front end (can be 2 or 3 people that wo
 
 - Donavan: UI Design
 - Gio: UI, Mapping
+- Nymere: Accounts and Buddy System (Split)
