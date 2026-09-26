@@ -95,6 +95,41 @@
     src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBx1piCOFQYkBt1I2qn-ghUuLRu2QXQhm8&libraries=maps"
     defer
   ></script>
+<body>
+
+  <h1>FriendsNME</h1>
+
+  <header class = "header">
+    <nav>
+      <ul class = "nav-menu">
+        <li class = "nav-item">Home</li>
+        <li class = "nav-item"><a href = "map.html">Map</a></li>
+        <li class = "nav-item"><a href = "https://github.com/giowassheree/FriendsNMe">GitHub</a></li>
+      </ul>
+    </nav>
+  </header>
+
+
+  <dialog id="popup">
+    <h2>Popup</h2>
+    <p>This is ane example</p>
+    <button id="closeBtn">Close</button>
+  </dialog>
+
+  <script>
+    const popup = document.getElementById('popup');
+    const closeBtn = document.getElementById('closeBtn');
+
+    document.addEventListener('DOMContentLoaded', () => {
+      popup.showModal();
+    });
+
+    document.addEventListener('click', () => {
+      popup.close();
+    });
+  </script>
+
+
 
 </body>
 </html>
