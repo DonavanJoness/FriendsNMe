@@ -25,8 +25,14 @@ const state = {
   email: "",
   step: "loading",
   resendTimer: null,
-  resendSeconds: 0
+  resendSeconds: 0,
+  locationWatchId: null,
+  locationSaveInProgress: false,
+  pendingLocation: null,
+  lastLocationSavedAt: 0
 };
+
+const LOCATION_SAVE_INTERVAL_MS = 3000;
 
 function isTempleEmail(email) {
   return /^[^\s@]+@temple\.edu$/i.test(email.trim());
@@ -176,6 +182,16 @@ function setLocationStatus(message, type = "") {
   locationStatus.className = type ? `location-${type}` : "";
 }
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function formatPosition(position) {
+  const { latitude, longitude, accuracy } = position.coords;
+  const accuracyText = Number.isFinite(accuracy) ? ` | Accuracy: ${Math.round(accuracy)}m` : "";
+  return `Latitude: ${latitude.toFixed(6)} | Longitude: ${longitude.toFixed(6)}${accuracyText}`;
+}
+
 async function saveLocation(position) {
   const { latitude, longitude, accuracy } = position.coords;
   return fetchJson("/api/location", {
@@ -189,27 +205,48 @@ async function saveLocation(position) {
   });
 }
 
-async function showLocation(position) {
+async function flushPendingLocation() {
+  if (state.locationSaveInProgress) {
+    return;
+  }
+
+  state.locationSaveInProgress = true;
+
+  while (state.pendingLocation) {
+    const position = state.pendingLocation;
+    state.pendingLocation = null;
+
+    const elapsed = Date.now() - state.lastLocationSavedAt;
+    if (elapsed < LOCATION_SAVE_INTERVAL_MS) {
+      await wait(LOCATION_SAVE_INTERVAL_MS - elapsed);
+    }
+
+    try {
+      await saveLocation(position);
+      state.lastLocationSavedAt = Date.now();
+      setLocationStatus(`${formatPosition(position)} | Live and saved`, "success");
+    } catch (error) {
+      if (error.status === 401) {
+        stopLiveLocation();
+        setLocked(true);
+        showForm("email");
+      }
+      setLocationStatus(`${formatPosition(position)} | Could not save: ${error.message}`, "error");
+    }
+  }
+
+  state.locationSaveInProgress = false;
+}
+
+function showLiveLocation(position) {
   const { latitude, longitude } = position.coords;
-  const lat = latitude.toFixed(6);
-  const lng = longitude.toFixed(6);
 
   campusMap.setAttribute("center", `${latitude},${longitude}`);
   campusMap.setAttribute("zoom", "16");
+  setLocationStatus(`${formatPosition(position)} | Live update received`, "success");
 
-  try {
-    await saveLocation(position);
-    setLocationStatus(`Latitude: ${lat} | Longitude: ${lng} saved for backend calculations.`, "success");
-  } catch (error) {
-    if (error.status === 401) {
-      setLocked(true);
-      showForm("email");
-    }
-    setLocationStatus(`Latitude: ${lat} | Longitude: ${lng}. Could not save: ${error.message}`, "error");
-  } finally {
-    locationButton.disabled = false;
-    locationButton.textContent = "Update location";
-  }
+  state.pendingLocation = position;
+  flushPendingLocation();
 }
 
 function showLocationError(error) {
@@ -221,10 +258,10 @@ function showLocationError(error) {
     "error"
   );
   locationButton.disabled = false;
-  locationButton.textContent = "Try again";
+  stopLiveLocation();
 }
 
-function getLocation() {
+function startLiveLocation() {
   if (!navigator.geolocation) {
     setLocationStatus("Geolocation is not supported by this browser.", "error");
     return;
@@ -234,11 +271,34 @@ function getLocation() {
   locationButton.textContent = "Requesting...";
   setLocationStatus("Waiting for browser location permission...");
 
-  navigator.geolocation.getCurrentPosition(showLocation, showLocationError, {
+  state.locationWatchId = navigator.geolocation.watchPosition(showLiveLocation, showLocationError, {
     enableHighAccuracy: true,
     timeout: 10000,
-    maximumAge: 60000
+    maximumAge: 5000
   });
+  locationButton.disabled = false;
+  locationButton.textContent = "Stop live location";
+}
+
+function stopLiveLocation() {
+  if (state.locationWatchId !== null && navigator.geolocation) {
+    navigator.geolocation.clearWatch(state.locationWatchId);
+  }
+
+  state.locationWatchId = null;
+  state.pendingLocation = null;
+  locationButton.disabled = false;
+  locationButton.textContent = "Start live location";
+}
+
+function toggleLiveLocation() {
+  if (state.locationWatchId === null) {
+    startLiveLocation();
+    return;
+  }
+
+  stopLiveLocation();
+  setLocationStatus("Live location stopped.");
 }
 
 emailInput.addEventListener("input", updateEmailSubmit);
@@ -350,6 +410,7 @@ changeEmailButton.addEventListener("click", () => {
 });
 
 logoutButton.addEventListener("click", async () => {
+  stopLiveLocation();
   await fetchJson("/api/auth/logout", { method: "POST", body: "{}" }).catch(() => {});
   userBadge.hidden = true;
   logoutButton.hidden = true;
@@ -357,7 +418,7 @@ logoutButton.addEventListener("click", async () => {
   setLocked(true);
 });
 
-locationButton.addEventListener("click", getLocation);
+locationButton.addEventListener("click", toggleLiveLocation);
 
 updateEmailSubmit();
 updateCodeSubmit();

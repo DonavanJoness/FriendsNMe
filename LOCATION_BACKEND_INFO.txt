@@ -1,15 +1,18 @@
 FriendsNMe Location Backend Info
 
 The website now asks the signed-in user for browser location permission.
-If the user allows location access, the frontend displays the latitude and
-longitude on the page and sends the same data to the backend for calculations.
+If the user allows location access, the frontend displays live latitude and
+longitude updates on the page and sends the latest location to the backend for
+calculations.
 
 Frontend behavior:
-- User clicks "Use my location".
+- User clicks "Start live location".
 - Browser asks for geolocation permission.
-- If permission is allowed, the page displays latitude and longitude.
-- The map is centered on the user's location.
-- The coordinates are sent to the backend.
+- If permission is allowed, the page displays live latitude, longitude, and
+  accuracy updates.
+- The map is centered on the user's latest location.
+- The latest coordinates are sent to the backend while live location is active.
+- The user can click "Stop live location" to stop browser location watching.
 - If permission is denied or unavailable, the page shows an inline error.
 
 Backend endpoint for saving location:
@@ -19,7 +22,7 @@ POST /api/location
 This endpoint requires the user to be authenticated.
 It uses the user's existing session cookie.
 
-Payload sent by the frontend:
+Payload sent by the frontend on live updates:
 
 {
   "latitude": 39.981234,
@@ -33,6 +36,13 @@ Fields:
 - longitude: User longitude from browser geolocation.
 - accuracy: Browser-provided accuracy in meters, when available.
 - capturedAt: Timestamp for when the browser captured the location.
+
+Save cadence:
+- The browser provides updates through navigator.geolocation.watchPosition().
+- The frontend displays each browser update immediately.
+- Backend saves are queued so requests do not overlap.
+- Saves are throttled to at most once every 3 seconds, using the latest pending
+  browser location.
 
 Server-side validation:
 - User must be signed in.
