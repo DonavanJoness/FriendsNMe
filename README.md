@@ -14,3 +14,5 @@ UI- how the map will be set up basically front end (can be 2 or 3 people that wo
 - Gio: UI, Mapping
 - Nymere: Accounts and Buddy System (Split)
 - Austin: Calculations/alerts 
+
+http://localhost:3000/

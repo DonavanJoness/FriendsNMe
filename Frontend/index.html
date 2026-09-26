@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FriendsNME</title>
   <link rel="stylesheet" href="./style.css" />
-  <script src="./index.js" defer></script>
+  <script type="module" src="./index.js" defer></script>
 </head>
-
 <body class="auth-locked">
   <header class="site-header">
     <div>
@@ -32,12 +31,21 @@
   <main id="app" class="map-shell" aria-label="FriendsNMe map">
     <gmp-map
       class="map_canvas"
+      id="campusMap"
       center="39.9800,-75.1600"
       zoom="14"
       map-id="DEMO_MAP_ID"
       color-scheme="DARK"
     >
     </gmp-map>
+
+    <section class="location-panel" aria-label="Current location">
+      <div>
+        <p class="eyebrow">Location</p>
+        <p id="locationStatus">Start live location to share coordinates for backend calculations.</p>
+      </div>
+      <button id="locationButton" class="primary-button compact-button" type="button">Start live location</button>
+    </section>
   </main>
 
   <div id="authOverlay" class="auth-overlay" role="dialog" aria-modal="true" aria-labelledby="authTitle">
