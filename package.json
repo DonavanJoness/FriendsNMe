@@ -1,0 +1,17 @@
+{
+  "name": "friendsnme",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FriendsNMe website with Temple email authentication",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "build": "node --check server/index.js && node --check server/auth.js && node --check server/database.js && node --check server/email.js && node --check Frontend/index.js"
+  },
+  "dependencies": {
+    "nodemailer": "^10.0.10"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

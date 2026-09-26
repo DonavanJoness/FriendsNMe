@@ -1,0 +1,78 @@
+FriendsNMe Location Backend Info
+
+The website now asks the signed-in user for browser location permission.
+If the user allows location access, the frontend displays the latitude and
+longitude on the page and sends the same data to the backend for calculations.
+
+Frontend behavior:
+- User clicks "Use my location".
+- Browser asks for geolocation permission.
+- If permission is allowed, the page displays latitude and longitude.
+- The map is centered on the user's location.
+- The coordinates are sent to the backend.
+- If permission is denied or unavailable, the page shows an inline error.
+
+Backend endpoint for saving location:
+
+POST /api/location
+
+This endpoint requires the user to be authenticated.
+It uses the user's existing session cookie.
+
+Payload sent by the frontend:
+
+{
+  "latitude": 39.981234,
+  "longitude": -75.153456,
+  "accuracy": 25,
+  "capturedAt": "2026-09-26T18:00:00.000Z"
+}
+
+Fields:
+- latitude: User latitude from browser geolocation.
+- longitude: User longitude from browser geolocation.
+- accuracy: Browser-provided accuracy in meters, when available.
+- capturedAt: Timestamp for when the browser captured the location.
+
+Server-side validation:
+- User must be signed in.
+- latitude must be a number between -90 and 90.
+- longitude must be a number between -180 and 180.
+- accuracy must be null or a positive number.
+- capturedAt must be a valid date.
+
+Stored location format:
+
+{
+  "latitude": 39.981234,
+  "longitude": -75.153456,
+  "accuracy": 25,
+  "capturedAt": "2026-09-26T18:00:00.000Z",
+  "updatedAt": "2026-09-26T18:00:01.000Z"
+}
+
+The location is stored on the authenticated user's record as:
+
+user.lastLocation
+
+Backend endpoint for reading the current user's saved location:
+
+GET /api/location/me
+
+Example response:
+
+{
+  "ok": true,
+  "location": {
+    "latitude": 39.981234,
+    "longitude": -75.153456,
+    "accuracy": 25,
+    "capturedAt": "2026-09-26T18:00:00.000Z",
+    "updatedAt": "2026-09-26T18:00:01.000Z"
+  }
+}
+
+If the user has not shared a location yet, location will be null.
+
+Backend programmers can use user.lastLocation or GET /api/location/me as the
+source for distance, buddy, alert, or map calculations.
