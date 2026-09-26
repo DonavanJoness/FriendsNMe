@@ -44,3 +44,9 @@ HOST=10.109.29.222 AUTH_LOG_VERIFICATION_CODES=true SESSION_SECRET=development-t
 
 Then share this link with people on the same network:
 http://10.109.29.222:5000/
+
+
+$env:AUTH_LOG_VERIFICATION_CODES="true"
+$env:SESSION_SECRET="development-test-secret-development-test-secret"
+node server/index.js
+
