@@ -10,3 +10,4 @@ alerts- once we receive the information from the calculations the alerts will co
 UI- how the map will be set up basically front end (can be 2 or 3 people that works on this) 
   
 
+- Donavan: UI Design
