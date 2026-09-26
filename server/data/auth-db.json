@@ -1,0 +1,29 @@
+{
+  "users": [
+    {
+      "id": "e5d8e4ec-5e24-46de-8e2e-f8bc080df227",
+      "email": "tul40930@temple.edu",
+      "username": "gio",
+      "usernameLower": "gio",
+      "lastLocation": {
+        "latitude": 39.98176157866464,
+        "longitude": -75.15316943365492,
+        "accuracy": 55,
+        "capturedAt": "2026-09-26T21:52:56.710Z",
+        "updatedAt": "2026-09-26T21:52:56.719Z"
+      },
+      "createdAt": "2026-09-26T21:52:43.274Z"
+    }
+  ],
+  "verificationCodes": [],
+  "sessions": [
+    {
+      "sessionHash": "57baf61882a206526fd0dca4791e8ebd35a55471ba28b9f6a2cddf5312f74589",
+      "userId": "e5d8e4ec-5e24-46de-8e2e-f8bc080df227",
+      "createdAt": "2026-09-26T21:52:43.278Z",
+      "lastSeenAt": "2026-09-26T23:01:20.507Z",
+      "expiresAt": "2026-10-26T21:52:43.278Z"
+    }
+  ],
+  "signupTokens": []
+}
