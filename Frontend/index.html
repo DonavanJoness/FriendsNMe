@@ -17,10 +17,20 @@
       <span id="userBadge" class="user-badge" hidden></span>
       <button id="logoutButton" class="ghost-button" type="button" hidden>Sign out</button>
     </div>
+
+    <div class = "nav-container">
+      <nav>
+        <ul class = "nav-menu">
+          <li class = "nav-item">Home</li>
+          <li class = "nav-item"><a href = "https://github.com/giowassheree/FriendsNMe">GitHub</a></li>
+        </ul>
+      </nav>
+    </div>
   </header>
 
   <main id="app" class="map-shell" aria-label="FriendsNMe map">
     <gmp-map
+      class="map_canvas"
       id="campusMap"
       center="39.9800,-75.1600"
       zoom="14"
