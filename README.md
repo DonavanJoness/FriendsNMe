@@ -9,7 +9,8 @@ alerts- once we receive the information from the calculations the alerts will co
 
 UI- how the map will be set up basically front end (can be 2 or 3 people that works on this) 
   
-
+- Duwayne: calculations/ alerts 
 - Donavan: UI Design
 - Gio: UI, Mapping
 - Nymere: Accounts and Buddy System (Split)
+- Austin: Calculations/alerts 
