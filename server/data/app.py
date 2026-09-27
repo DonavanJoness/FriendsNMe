@@ -15,6 +15,8 @@ from models import db, User, VerificationCode, LocationShare
 
 from party import PartyTracker, FRESH_SECONDS
 
+from calculations import CLUSTER_DISTANCE
+
 
 # ==================================================
 # FOLDERS
@@ -816,9 +818,12 @@ def map_payload(user):
             "status": my_status["status"],
             "distanceFromParty":
                 my_status["distanceFromParty"],
+            # The party I left, if I can still rejoin it.
+            "leftParty": my_status["leftParty"],
         },
         "friends": friends,
         "freshSeconds": FRESH_SECONDS,
+        "clusterDistance": CLUSTER_DISTANCE,
     }
 
 
@@ -936,6 +941,23 @@ def leave_party():
         return json_error("You must be signed in.", 401)
 
     party_tracker.leave(user.id)
+
+    return jsonify(map_payload(user))
+
+
+@app.post("/api/party/rejoin")
+def rejoin_party():
+
+    user = require_user()
+
+    if not user:
+        return json_error("You must be signed in.", 401)
+
+    if not party_tracker.rejoin(user.id):
+        return json_error(
+            "That party has ended, so there is nothing to rejoin.",
+            409
+        )
 
     return jsonify(map_payload(user))
 

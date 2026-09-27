@@ -35,6 +35,18 @@ RADIUS_SCALE = 1.5
 # Most GPS error we give someone the benefit of the doubt for.
 MAX_ACCURACY_MARGIN = 25  # meters
 
+# TEMPORARY TEST SETTING
+# Smaller distances so wandering can be tested by walking a short
+# way (~30 m instead of ~80 m). Set this to False for real parties.
+SMALL_RADIUS_TESTING = True
+
+if SMALL_RADIUS_TESTING:
+    CLUSTER_DISTANCE = 20  # meters
+    MIN_PARTY_RADIUS = 15  # meters
+    WARNING_BUFFER = 10  # meters
+    ALERT_BUFFER = 25  # meters
+    MAX_ACCURACY_MARGIN = 10  # meters
+
 
 # ==================================================
 # GPS -> X/Y METERS
@@ -217,7 +229,7 @@ def calculate_party_radius(
         distances
     )
 
-    # Never make the party area smaller than 30m.
+    # Never make the party area smaller than MIN_PARTY_RADIUS.
     party_radius = max(
         detected_radius,
         MIN_PARTY_RADIUS

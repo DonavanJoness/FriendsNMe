@@ -22,6 +22,7 @@ const mapEls = {
   partyStatusLabel: document.getElementById("partyStatusLabel"),
   partyStatusDetail: document.getElementById("partyStatusDetail"),
   leaveParty: document.getElementById("leaveParty"),
+  rejoinParty: document.getElementById("rejoinParty"),
   friendsList: document.getElementById("friendsList"),
   friendsCount: document.getElementById("friendsCount"),
 };
@@ -283,13 +284,15 @@ function renderParty(me) {
   if (!mapLoaded) return;
 
   const source = map.getSource("party");
-  if (!me || !me.party) {
+  // A party we left stays on the map in gray so we can find it.
+  const party = me && (me.party || me.leftParty);
+  if (!party) {
     source.setData(emptyCollection());
     return;
   }
 
-  const { center, radius } = me.party;
-  const color = toneColor(STATUS_INFO[me.status].tone);
+  const { center, radius } = party;
+  const color = toneColor(me.party ? STATUS_INFO[me.status].tone : "none");
 
   source.setData({
     type: "FeatureCollection",
@@ -306,18 +309,23 @@ function renderStatus(me) {
   mapEls.partyStatus.dataset.tone = info.tone;
   mapEls.partyStatusLabel.textContent = info.label;
   mapEls.leaveParty.hidden = !me.party;
+  mapEls.rejoinParty.hidden = !me.leftParty;
 
   if (me.party) {
     const people = me.party.memberCount === 1 ? "1 person" : `${me.party.memberCount} people`;
     mapEls.partyStatusDetail.textContent =
       `${Math.round(me.distanceFromParty)} m from the center · ` +
       `${Math.round(me.party.radius)} m radius · ${people}`;
+  } else if (me.leftParty) {
+    mapEls.partyStatusLabel.textContent = "You left the party";
+    mapEls.partyStatusDetail.textContent =
+      "It's shown in gray on the map. Rejoin any time while it's still going.";
   } else if (watchId === null) {
     mapEls.partyStatusDetail.textContent =
       "Press “Use my location” to find your party.";
   } else {
     mapEls.partyStatusDetail.textContent =
-      "A party starts when you and someone else are within 30 m of each other.";
+      `A party starts when you and someone else are within ${latestData.clusterDistance} m of each other.`;
   }
 }
 
@@ -428,17 +436,25 @@ function renderFriends(friends, freshSeconds) {
   }
 }
 
-mapEls.leaveParty.addEventListener("click", () => {
-  mapEls.leaveParty.disabled = true;
-  api("/api/party/leave", {})
-    .then(render)
-    .catch((leaveError) => {
-      mapEls.locationText.textContent = leaveError.message;
-    })
-    .finally(() => {
-      mapEls.leaveParty.disabled = false;
-    });
-});
+// Leave / Rejoin: POST, then redraw with the server's answer.
+function partyButton(button, path) {
+  button.addEventListener("click", () => {
+    button.disabled = true;
+    api(path, {})
+      .then(render)
+      .catch((partyError) => {
+        mapEls.locationText.textContent = partyError.message;
+        // e.g. the party ended; refresh so the button goes away.
+        refresh();
+      })
+      .finally(() => {
+        button.disabled = false;
+      });
+  });
+}
+
+partyButton(mapEls.leaveParty, "/api/party/leave");
+partyButton(mapEls.rejoinParty, "/api/party/rejoin");
 
 // ==================================================
 // SIGN IN / SIGN OUT (events come from index.js)
