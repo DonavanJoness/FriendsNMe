@@ -141,28 +141,48 @@
     x.textContent = "Location tracking stopped.";
   }
 
-  function success(position) {
-    const lat = position.coords.latitude;
-    const lng = position.coords.longitude;
-    x.textContent = "Latitude: " + lat.toFixed(5) + ", Longitude: " + lng.toFixed(5);
+function success(position) {
+  const lat = position.coords.latitude;
+  const lng = position.coords.longitude;
 
-    const map = document.querySelector("gmp-map");
-    if (map) {
-      map.center = { lat: lat, lng: lng };
-      map.zoom = 16;
-    }
+  // Display the iPhone's location
+  x.textContent =
+    "Latitude: " + lat.toFixed(5) +
+    ", Longitude: " + lng.toFixed(5);
+
+  // Move Google Maps to the iPhone's location
+  const map = document.querySelector("gmp-map");
+
+  if (map) {
+    map.center = {
+      lat: lat,
+      lng: lng
+    };
+
+    map.zoom = 16;
   }
 
-  function error(err) {
-    if (err.code === err.PERMISSION_DENIED) {
-      x.textContent = "Location permission was denied.";
-      navigator.geolocation.clearWatch(watchId);
-      watchId = null;
-      locationButton.textContent = "Use my location";
-    } else {
-      x.textContent = "Sorry, no position available.";
-    }
-  }
+  // Send the iPhone's location to Flask
+  fetch("/location", {
+    method: "POST",
+
+    headers: {
+      "Content-Type": "application/json"
+    },
+
+    body: JSON.stringify({
+      latitude: lat,
+      longitude: lng
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    console.log("Response from calculations.py:", data);
+  })
+  .catch(error => {
+    console.error("Error sending location:", error);
+  });
+}
 
   locationButton.addEventListener("click", getLocation);
 </script>
