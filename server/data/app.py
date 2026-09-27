@@ -103,6 +103,17 @@ def iso_now():
     return now_utc().isoformat()
 
 
+def as_utc(value):
+
+    # SQLite drops timezone info, so datetimes read back
+    # from the database are naive. They were stored as UTC.
+
+    if value is not None and value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+
+    return value
+
+
 def normalize_email(email):
     return str(email or "").strip().lower()
 
@@ -373,7 +384,9 @@ def request_code():
 
     if recent_codes:
 
-        latest_created = recent_codes[0].created_at
+        latest_created = as_utc(
+            recent_codes[0].created_at
+        )
 
         if (
             current - latest_created
