@@ -25,13 +25,19 @@ const els = {
   friendsCount: $("friendsCount"),
 };
 
-const STORAGE_KEY = "friendsnme.accounts";
-const SESSION_KEY = "friendsnme.session";
 // Same list the Sharing page writes to.
 const FRIENDS_KEY = "friendsnme.sharedAccounts";
 const TEMPLE_EMAIL = /^[^\s@]+@temple\.edu$/i;
 
 let pendingEmail = "";
+
+function readJSON(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 // POST/GET JSON to the Flask API. Same-origin, so the session cookie
 // is sent automatically; "same-origin" makes that explicit.
@@ -111,9 +117,8 @@ function renderFriends() {
   });
 }
 
-function unlock(session) {
-  renderFriends();
 function unlock(user) {
+  renderFriends();
   document.body.classList.remove("auth-locked");
   els.overlay.hidden = true;
   els.badge.textContent = user.username;
@@ -273,9 +278,6 @@ window.addEventListener("storage", (event) => {
 
 renderFriends();
 
-// Restore an existing session
-const session = readJSON(SESSION_KEY, null);
-if (session?.username) unlock(session);
 // Restore an existing server session on page load
 api("/api/auth/session")
   .then((data) => unlock(data.user))
