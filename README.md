@@ -102,6 +102,18 @@ How parties work (`server/data/party.py`):
   radius, 20 m to form a party, buffer +10 m, wandering +25 m, GPS error
   forgiven up to 10 m). Set it to `False` for real use.
 
+Wandering alerts (`Frontend/alerts.js`):
+
+- When you or a friend in your party moves to `WANDERING` or `FAR_FROM_PARTY`,
+  the page shows a banner, vibrates (Android) and sends a phone notification
+  if you tapped "Turn on phone notifications". You also get one when they are
+  back. Repeats for the same person are held back for 2 minutes.
+- These only work while the page is open. Phones pause web pages when the
+  screen is off or the browser is in the background; alerts in that case
+  would need Web Push from the server.
+- Notifications need https (or localhost), like location. On iPhone they only
+  work if the site is added to the home screen.
+
 Location sharing is one-way: adding someone on the Sharing page lets them see
 you on their map. They only appear on yours if they add you back.
 

@@ -257,6 +257,7 @@ function render(data) {
   renderStatus(data.me);
   renderFriends(data.friends, data.freshSeconds);
   frameOnce(data);
+  checkForAlerts(data); // alerts.js
 }
 
 // On the first load, zoom to the party and friends. After that the
@@ -490,6 +491,7 @@ document.addEventListener("friendsnme:signed-out", () => {
 
   latestData = null;
   hasFramed = false;
+  resetAlerts(); // alerts.js
   userMarker.remove();
   userMarkerAdded = false;
   friendMarkers.forEach((marker) => marker.remove());

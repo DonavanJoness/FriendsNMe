@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import mimetypes
 import os
 import random
 import re
@@ -23,6 +24,10 @@ from calculations import CLUSTER_DISTANCE
 # ==================================================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Windows can map .js to text/plain in the registry, and browsers
+# refuse to run a service worker (sw.js) served that way.
+mimetypes.add_type("application/javascript", ".js")
 
 FRONTEND_DIR = os.path.abspath(
     os.path.join(BASE_DIR, "..", "..", "Frontend")
@@ -782,6 +787,7 @@ def map_payload(user):
             "location": None,
             "ageSeconds": None,
             "status": "NOT_IN_PARTY",
+            "distanceFromParty": None,
             "sameParty": False,
         }
 
@@ -804,6 +810,9 @@ def map_payload(user):
                 current
             )
             entry["status"] = friend_status["status"]
+            entry["distanceFromParty"] = (
+                friend_status["distanceFromParty"]
+            )
             entry["sameParty"] = bool(
                 my_party_id
                 and friend_status["party"]
