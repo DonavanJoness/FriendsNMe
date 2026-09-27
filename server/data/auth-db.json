@@ -1,0 +1,29 @@
+{
+  "users": [
+    {
+      "id": "ea4542cf-da85-4c99-b56b-3582670471d4",
+      "email": "tur77722@temple.edu",
+      "username": "Donny",
+      "usernameLower": "donny",
+      "lastLocation": {
+        "latitude": 39.98161567505877,
+        "longitude": -75.15324221003848,
+        "accuracy": 35,
+        "capturedAt": "2026-09-26T21:12:14.323Z",
+        "updatedAt": "2026-09-26T21:12:17.340Z"
+      },
+      "createdAt": "2026-09-26T20:25:57.609Z"
+    }
+  ],
+  "verificationCodes": [],
+  "sessions": [
+    {
+      "sessionHash": "017cbee2e28811a90742906cc082f5c54270d4e938b30c749aa8999172f2a4c0",
+      "userId": "ea4542cf-da85-4c99-b56b-3582670471d4",
+      "createdAt": "2026-09-26T21:32:01.220Z",
+      "lastSeenAt": "2026-09-26T23:41:00.898Z",
+      "expiresAt": "2026-10-26T21:32:01.220Z"
+    }
+  ],
+  "signupTokens": []
+}

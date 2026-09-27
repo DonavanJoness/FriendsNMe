@@ -1,7 +1,0 @@
-node_modules/
-.env
-.DS_Store
-.idea/
-server/data/
-__pycache__/
-.venv/
