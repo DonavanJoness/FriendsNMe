@@ -1,0 +1,13 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Local data: user emails, locations and sessions. Never commit these.
+*.db
+*.sqlite3
+server/data/auth-db.json
+
+# Secrets
+.env

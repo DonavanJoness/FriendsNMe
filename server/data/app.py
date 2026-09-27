@@ -11,17 +11,9 @@ from email.message import EmailMessage
 
 from flask import Flask, request, jsonify, send_from_directory, session
 
-from models import db, User, VerificationCode
+from models import db, User, VerificationCode, LocationShare
 
-from calculations import (
-    gps_to_xy,
-    detect_party_cluster,
-    find_party_center,
-    calculate_party_radius,
-    distance_from_party,
-    wandering_status,
-    MIN_PARTY_USERS,
-)
+from party import PartyTracker, FRESH_SECONDS
 
 
 # ==================================================
@@ -41,28 +33,39 @@ FRONTEND_DIR = os.path.abspath(
 
 app = Flask(__name__)
 
-app.secret_key = os.environ.get(
-    "SESSION_SECRET",
-    "development-only-secret-change-me"
+# Debug mode turns on the Werkzeug debugger and /api/debug/users.
+# Only enable it on your own machine: FRIENDSNME_DEBUG=true
+DEBUG_MODE = (
+    os.environ.get("FRIENDSNME_DEBUG", "").lower()
+    == "true"
 )
+
+# The secret signs login cookies. A hard-coded fallback would let
+# anyone who has read this file forge a session, so when
+# SESSION_SECRET is unset we use a random one instead. Sessions
+# then reset whenever the server restarts.
+app.secret_key = os.environ.get("SESSION_SECRET")
+
+if not app.secret_key:
+
+    app.secret_key = secrets.token_hex(32)
+
+    print(
+        "WARNING: SESSION_SECRET is not set. Using a random secret; "
+        "everyone will be signed out when the server restarts.",
+        flush=True
+    )
 
 app.permanent_session_lifetime = timedelta(days=30)
 
 
 # ==================================================
-# LOCKED PARTY STATE
+# PARTY STATE
 # ==================================================
 
-# Hackathon/testing version: this lives in server memory.
-# Restarting app.py resets the party so two phones can establish a new one.
-party_state = {
-    "locked": False,
-    "center_latitude": None,
-    "center_longitude": None,
-    "radius": None,
-    "member_ids": [],
-    "founder_ids": [],
-}
+# Lives in server memory (see party.py), so restarting
+# app.py clears all parties.
+party_tracker = PartyTracker()
 
 
 # ==================================================
@@ -90,7 +93,8 @@ with app.app_context():
 
     print("Users currently stored:", len(users))
 
-    for user in users:
+    # Emails and locations only go to the log in debug mode.
+    for user in (users if DEBUG_MODE else []):
 
         print(
             "USER:",
@@ -679,6 +683,146 @@ def logout():
 
 
 # ==================================================
+# LOCATION HELPERS
+# ==================================================
+
+def location_age_seconds(location, current):
+
+    try:
+        updated = datetime.fromisoformat(
+            location["updatedAt"]
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+    return (current - as_utc(updated)).total_seconds()
+
+
+def has_location(user):
+
+    loc = user.last_location
+
+    return (
+        isinstance(loc, dict)
+        and "latitude" in loc
+        and "longitude" in loc
+    )
+
+
+def party_locations(current):
+
+    # Everyone's latest location in the shape party.py wants.
+    locations = []
+
+    for database_user in User.query.all():
+
+        if not has_location(database_user):
+            continue
+
+        age = location_age_seconds(
+            database_user.last_location,
+            current
+        )
+
+        if age is None:
+            continue
+
+        loc = database_user.last_location
+
+        locations.append({
+            "id": database_user.id,
+            "latitude": float(loc["latitude"]),
+            "longitude": float(loc["longitude"]),
+            "accuracy": loc.get("accuracy"),
+            "age_seconds": age,
+        })
+
+    return locations
+
+
+def map_payload(user):
+
+    # Everything the map needs: my party and status, plus the
+    # friends who chose to share their location with me.
+    current = now_utc()
+
+    party_tracker.expire(current)
+
+    my_status = party_tracker.status_for(
+        user.id,
+        user.last_location if has_location(user) else None
+    )
+
+    my_party_id = (
+        my_status["party"]["id"]
+        if my_status["party"]
+        else None
+    )
+
+    friends = []
+
+    shared_with_me = (
+        User.query
+        .join(
+            LocationShare,
+            LocationShare.owner_id == User.id
+        )
+        .filter(LocationShare.viewer_id == user.id)
+        .order_by(User.username_lower)
+        .all()
+    )
+
+    for friend in shared_with_me:
+
+        entry = {
+            "id": friend.id,
+            "username": friend.username,
+            "location": None,
+            "ageSeconds": None,
+            "status": "NOT_IN_PARTY",
+            "sameParty": False,
+        }
+
+        if has_location(friend):
+
+            loc = friend.last_location
+
+            friend_status = party_tracker.status_for(
+                friend.id,
+                loc
+            )
+
+            entry["location"] = {
+                "latitude": loc["latitude"],
+                "longitude": loc["longitude"],
+                "accuracy": loc.get("accuracy"),
+            }
+            entry["ageSeconds"] = location_age_seconds(
+                loc,
+                current
+            )
+            entry["status"] = friend_status["status"]
+            entry["sameParty"] = bool(
+                my_party_id
+                and friend_status["party"]
+                and friend_status["party"]["id"] == my_party_id
+            )
+
+        friends.append(entry)
+
+    return {
+        "me": {
+            "party": my_status["party"],
+            "status": my_status["status"],
+            "distanceFromParty":
+                my_status["distanceFromParty"],
+        },
+        "friends": friends,
+        "freshSeconds": FRESH_SECONDS,
+    }
+
+
+# ==================================================
 # LOCATION
 # ==================================================
 
@@ -699,8 +843,32 @@ def location():
             "error": "Latitude and longitude are required"
         }), 400
 
-    latitude = float(latitude)
-    longitude = float(longitude)
+    try:
+        latitude = float(latitude)
+        longitude = float(longitude)
+    except (TypeError, ValueError):
+        return json_error(
+            "Latitude and longitude must be numbers.",
+            400
+        )
+
+    if not (
+        -90 <= latitude <= 90
+        and -180 <= longitude <= 180
+    ):
+        return json_error(
+            "Latitude or longitude is out of range.",
+            400
+        )
+
+    # Accuracy is optional; ignore anything that isn't a
+    # sensible number of meters.
+    try:
+        accuracy = float(accuracy)
+        if not 0 <= accuracy < 100000:
+            accuracy = None
+    except (TypeError, ValueError):
+        accuracy = None
 
     user = require_user()
 
@@ -724,482 +892,204 @@ def location():
 
     db.session.commit()
 
-    print("\n================================")
-    print("LOCATION RECEIVED")
-    print("================================")
-    print("User:", user.username)
-    print("Latitude:", latitude)
-    print("Longitude:", longitude)
-    print("Accuracy:", accuracy)
+    print(
+        "LOCATION:",
+        user.username,
+        round(latitude, 6),
+        round(longitude, 6),
+        "| accuracy:",
+        accuracy,
+        flush=True
+    )
 
     # --------------------------------------------------
-    # GET EVERY USER WHO HAS A VALID LOCATION
+    # RECALCULATE PARTIES WITH EVERYONE'S LATEST LOCATION
     # --------------------------------------------------
 
-    users_with_locations = []
+    current = now_utc()
 
-    for database_user in User.query.all():
-
-        loc = database_user.last_location
-
-        if (
-            isinstance(loc, dict)
-            and "latitude" in loc
-            and "longitude" in loc
-        ):
-
-            users_with_locations.append(
-                database_user
-            )
-
-    print(
-        "Users with locations:",
-        len(users_with_locations)
+    party_tracker.update(
+        party_locations(current),
+        current
     )
 
-    # ==================================================
-    # CREATE AND LOCK PARTY
-    # ==================================================
+    return jsonify(map_payload(user))
 
-    if not party_state["locked"]:
 
-        # ----------------------------------------------
-        # NOT ENOUGH PHONES YET
-        # ----------------------------------------------
+@app.get("/api/map")
+def map_data():
 
-        if len(users_with_locations) < MIN_PARTY_USERS:
+    user = require_user()
 
-            print(
-                "Waiting for more users:",
-                len(users_with_locations),
-                "/",
-                MIN_PARTY_USERS
-            )
+    if not user:
+        return json_error("You must be signed in.", 401)
 
-            return jsonify({
-                "partyDetected": False,
-                "partyLocked": False,
-                "activeUsers":
-                    len(users_with_locations),
-                "requiredUsers":
-                    MIN_PARTY_USERS,
-                "message":
-                    "Waiting for more users"
-            })
+    return jsonify(map_payload(user))
 
-        # ----------------------------------------------
-        # TEMPORARY REFERENCE POINT
-        # ----------------------------------------------
 
-        reference_lat = float(
-            users_with_locations[0]
-            .last_location["latitude"]
+@app.post("/api/party/leave")
+def leave_party():
+
+    user = require_user()
+
+    if not user:
+        return json_error("You must be signed in.", 401)
+
+    party_tracker.leave(user.id)
+
+    return jsonify(map_payload(user))
+
+
+# ==================================================
+# LOCATION SHARING
+# ==================================================
+
+def share_entry(user, sharing_ids):
+
+    return {
+        "id": user.id,
+        "username": user.username,
+        "sharing": user.id in sharing_ids,
+    }
+
+
+def my_sharing_ids(user):
+
+    return {
+        share.viewer_id
+        for share in LocationShare.query.filter_by(
+            owner_id=user.id
+        )
+    }
+
+
+@app.get("/api/users/search")
+def search_users():
+
+    user = require_user()
+
+    if not user:
+        return json_error("You must be signed in.", 401)
+
+    query = str(request.args.get("q") or "").strip().lower()
+
+    if len(query) < 2:
+        return json_error(
+            "Type at least 2 characters to search.",
+            400
         )
 
-        reference_lon = float(
-            users_with_locations[0]
-            .last_location["longitude"]
+    # Usernames match partially; emails only match exactly so
+    # the search can't be used to list everyone's email.
+    if "@" in query:
+        condition = User.email == query
+    else:
+        escaped = (
+            query
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+        condition = User.username_lower.like(
+            f"%{escaped}%",
+            escape="\\"
         )
 
-        calculation_users = []
-
-        # ----------------------------------------------
-        # CONVERT GPS LOCATIONS INTO METERS
-        # ----------------------------------------------
-
-        for database_user in users_with_locations:
-
-            loc = database_user.last_location
-
-            user_lat = float(
-                loc["latitude"]
-            )
-
-            user_lon = float(
-                loc["longitude"]
-            )
-
-            x, y = gps_to_xy(
-                user_lat,
-                user_lon,
-                reference_lat,
-                reference_lon
-            )
-
-            calculation_users.append({
-                "id":
-                    database_user.id,
-
-                "username":
-                    database_user.username,
-
-                "latitude":
-                    user_lat,
-
-                "longitude":
-                    user_lon,
-
-                "x":
-                    x,
-
-                "y":
-                    y
-            })
-
-            print(
-                database_user.username,
-                "| X:",
-                round(x, 2),
-                "| Y:",
-                round(y, 2)
-            )
-
-        # ----------------------------------------------
-        # CHECK FOR PARTY CLUSTER
-        # ----------------------------------------------
-
-        party_users = detect_party_cluster(
-            calculation_users
-        )
-
-        if len(party_users) < MIN_PARTY_USERS:
-
-            print(
-                "NO PARTY DETECTED - "
-                "users are not close enough together."
-            )
-
-            return jsonify({
-                "partyDetected": False,
-                "partyLocked": False,
-                "activeUsers":
-                    len(calculation_users),
-                "clusteredUsers":
-                    len(party_users),
-                "requiredUsers":
-                    MIN_PARTY_USERS,
-                "message":
-                    "Users are not close enough together"
-            })
-
-        # ==================================================
-        # FIRST USERS ESTABLISH PARTY
-        # ==================================================
-
-        # MIN_PARTY_USERS should currently be 2.
-        # Therefore only the first two clustered phones
-        # establish the permanent center/radius.
-
-        founding_users = (
-            party_users[:MIN_PARTY_USERS]
-        )
-
-        founder_center = find_party_center(
-            founding_users
-        )
-
-        locked_radius = calculate_party_radius(
-            founding_users,
-            founder_center[0],
-            founder_center[1]
-        )
-
-        # ----------------------------------------------
-        # LOCK ACTUAL GPS CENTER
-        # ----------------------------------------------
-
-        locked_center_lat = sum(
-            founding_user["latitude"]
-            for founding_user in founding_users
-        ) / len(founding_users)
-
-        locked_center_lon = sum(
-            founding_user["longitude"]
-            for founding_user in founding_users
-        ) / len(founding_users)
-
-        # ----------------------------------------------
-        # SAVE LOCKED PARTY
-        # ----------------------------------------------
-
-        party_state["locked"] = True
-
-        party_state["center_latitude"] = (
-            locked_center_lat
-        )
-
-        party_state["center_longitude"] = (
-            locked_center_lon
-        )
-
-        party_state["radius"] = (
-            locked_radius
-        )
-
-        party_state["founder_ids"] = [
-            founding_user["id"]
-            for founding_user in founding_users
-        ]
-
-        party_state["member_ids"] = list(
-            party_state["founder_ids"]
-        )
-
-        print("\n================================")
-        print("PARTY DETECTED AND LOCKED!")
-        print("================================")
-
-        print(
-            "Founders:",
-            [
-                founding_user["username"]
-                for founding_user
-                in founding_users
-            ]
-        )
-
-        print(
-            "Locked center GPS:",
-            round(
-                locked_center_lat,
-                7
-            ),
-            round(
-                locked_center_lon,
-                7
-            )
-        )
-
-        print(
-            "Locked radius:",
-            round(
-                locked_radius,
-                2
-            ),
-            "meters"
-        )
-
-    # ==================================================
-    # CHECK EVERY PHONE AGAINST LOCKED PARTY
-    # ==================================================
-
-    locked_center_lat = (
-        party_state["center_latitude"]
+    matches = (
+        User.query
+        .filter(condition, User.id != user.id)
+        .order_by(User.username_lower)
+        .limit(10)
+        .all()
     )
 
-    locked_center_lon = (
-        party_state["center_longitude"]
-    )
-
-    locked_radius = (
-        party_state["radius"]
-    )
-
-    user_statuses = []
-
-    for database_user in users_with_locations:
-
-        loc = database_user.last_location
-
-        user_lat = float(
-            loc["latitude"]
-        )
-
-        user_lon = float(
-            loc["longitude"]
-        )
-
-        # Locked center becomes (0,0).
-        user_x, user_y = gps_to_xy(
-            user_lat,
-            user_lon,
-            locked_center_lat,
-            locked_center_lon
-        )
-
-        distance = distance_from_party(
-            user_x,
-            user_y,
-            0,
-            0
-        )
-
-        is_member = (
-            database_user.id
-            in party_state["member_ids"]
-        )
-
-        just_joined = False
-
-        # ==================================================
-        # NEW PHONE ENTERS PARTY
-        # ==================================================
-
-        # A new phone only becomes a member when it
-        # physically enters the ORIGINAL locked radius.
-        #
-        # The center and radius DO NOT change.
-
-        if (
-            not is_member
-            and distance <= locked_radius
-        ):
-
-            party_state[
-                "member_ids"
-            ].append(
-                database_user.id
-            )
-
-            is_member = True
-            just_joined = True
-
-            print(
-                "NEW PARTY MEMBER:",
-                database_user.username
-            )
-
-        # ==================================================
-        # MEMBER STATUS
-        # ==================================================
-
-        # Once someone has joined, they remain a party
-        # member even after walking outside the radius.
-        # That allows BUFFER/WANDERING/FAR detection.
-
-        if is_member:
-
-            status = wandering_status(
-                distance,
-                locked_radius
-            )
-
-        else:
-
-            status = "NOT_IN_PARTY"
-
-        user_statuses.append({
-            "id":
-                database_user.id,
-
-            "username":
-                database_user.username,
-
-            "distanceFromParty":
-                round(distance, 2),
-
-            "status":
-                status,
-
-            "partyMember":
-                is_member,
-
-            "justJoined":
-                just_joined
-        })
-
-        print(
-            database_user.username,
-            "| Distance:",
-            round(distance, 2),
-            "meters",
-            "| Member:",
-            is_member,
-            "| Status:",
-            status
-        )
-
-    # ==================================================
-    # PARTY MEMBER NAMES
-    # ==================================================
-
-    all_users = User.query.all()
-
-    member_names = [
-        database_user.username
-        for database_user in all_users
-        if database_user.id
-        in party_state["member_ids"]
-    ]
-
-    founder_names = [
-        database_user.username
-        for database_user in all_users
-        if database_user.id
-        in party_state["founder_ids"]
-    ]
-
-    print("================================")
-    print("PARTY REMAINS LOCKED")
-    print("Founders:", founder_names)
-    print("Members:", member_names)
-
-    print(
-        "Locked center GPS:",
-        round(
-            locked_center_lat,
-            7
-        ),
-        round(
-            locked_center_lon,
-            7
-        )
-    )
-
-    print(
-        "Locked radius:",
-        round(
-            locked_radius,
-            2
-        ),
-        "meters"
-    )
-
-    print("================================")
-
-    # ==================================================
-    # SEND RESULTS TO PHONE
-    # ==================================================
+    sharing_ids = my_sharing_ids(user)
 
     return jsonify({
-        "partyDetected": True,
-        "partyLocked": True,
-
-        "party": {
-
-            "founders":
-                founder_names,
-
-            "memberCount":
-                len(member_names),
-
-            "members":
-                member_names,
-
-            "center": {
-                "latitude":
-                    round(
-                        locked_center_lat,
-                        7
-                    ),
-
-                "longitude":
-                    round(
-                        locked_center_lon,
-                        7
-                    )
-            },
-
-            "radius":
-                round(
-                    locked_radius,
-                    2
-                )
-        },
-
-        "users":
-            user_statuses
+        "users": [
+            share_entry(match, sharing_ids)
+            for match in matches
+        ]
     })
+
+
+@app.get("/api/shares")
+def list_shares():
+
+    user = require_user()
+
+    if not user:
+        return json_error("You must be signed in.", 401)
+
+    sharing_with = (
+        User.query
+        .join(
+            LocationShare,
+            LocationShare.viewer_id == User.id
+        )
+        .filter(LocationShare.owner_id == user.id)
+        .order_by(User.username_lower)
+        .all()
+    )
+
+    return jsonify({
+        "sharingWith": [
+            {"id": viewer.id, "username": viewer.username}
+            for viewer in sharing_with
+        ]
+    })
+
+
+@app.post("/api/shares")
+def add_share():
+
+    user = require_user()
+
+    if not user:
+        return json_error("You must be signed in.", 401)
+
+    body = request.get_json(silent=True) or {}
+
+    viewer = find_user_by_id(str(body.get("userId") or ""))
+
+    if not viewer or viewer.id == user.id:
+        return json_error("That account doesn't exist.", 404)
+
+    if not LocationShare.query.filter_by(
+        owner_id=user.id,
+        viewer_id=viewer.id
+    ).first():
+
+        db.session.add(
+            LocationShare(
+                owner_id=user.id,
+                viewer_id=viewer.id
+            )
+        )
+        db.session.commit()
+
+    return jsonify({
+        "ok": True,
+        "user": {"id": viewer.id, "username": viewer.username}
+    }), 201
+
+
+@app.delete("/api/shares/<viewer_id>")
+def remove_share(viewer_id):
+
+    user = require_user()
+
+    if not user:
+        return json_error("You must be signed in.", 401)
+
+    LocationShare.query.filter_by(
+        owner_id=user.id,
+        viewer_id=viewer_id
+    ).delete()
+
+    db.session.commit()
+
+    return jsonify({"ok": True})
 
 
 # ==================================================
@@ -1231,6 +1121,14 @@ def get_my_location():
 
 @app.get("/api/debug/users")
 def debug_users():
+
+    # Lists every user's email and location, so it only
+    # exists in debug mode and still requires a login.
+    if not DEBUG_MODE:
+        return json_error("Not found.", 404)
+
+    if not require_user():
+        return json_error("You must be signed in.", 401)
 
     users = User.query.all()
 
@@ -1305,5 +1203,5 @@ if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
         port=5000,
-        debug=True
+        debug=DEBUG_MODE
     )

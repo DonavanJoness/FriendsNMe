@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 
 <head>
@@ -7,10 +7,12 @@
 
   <title>FriendsNME</title>
 
+  <!-- MapLibre's CSS first so style.css can restyle popups -->
+  <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
   <link rel="stylesheet" href="./style.css" />
   <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
-  <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
   <script src="./index.js" defer></script>
+  <script src="./map.js" defer></script>
 </head>
 
 
@@ -66,10 +68,29 @@
           Use my location
         </button>
         <p
-          id="demo"
+          id="locationText"
           class="field-hint"
           aria-live="polite">
         </p>
+
+        <section
+          id="partyStatus"
+          class="party-status"
+          data-tone="none"
+          aria-live="polite"
+          hidden>
+          <div>
+            <strong id="partyStatusLabel"></strong>
+            <span id="partyStatusDetail"></span>
+          </div>
+          <button
+            id="leaveParty"
+            class="share-remove-button"
+            type="button"
+            hidden>
+            Leave party
+          </button>
+        </section>
       </div>
     </div>
 
@@ -82,7 +103,7 @@
 
       <div id="friendsList" class="shared-accounts friends-list"></div>
 
-      <a class="ghost-button friends-manage" href="sharing.html">Manage friends</a>
+      <a class="ghost-button friends-manage" href="sharing.html">Manage sharing</a>
     </aside>
   </main>
 
@@ -240,112 +261,6 @@
   </div>
 
 
-  <script>
-    // OpenFreeMap (MapLibre GL) - MapLibre uses [lng, lat] order
-    const map = new maplibregl.Map({
-      container: "map",
-      style: "https://tiles.openfreemap.org/styles/dark",
-      center: [-75.16, 39.98],
-      zoom: 14
-    });
-    map.addControl(new maplibregl.NavigationControl());
-
-    // Make all labels (street names, places, etc.) white
-    map.on("load", () => {
-      for (const layer of map.getStyle().layers) {
-        if (layer.type === "symbol" && layer.layout && layer.layout["text-field"]) {
-          map.setPaintProperty(layer.id, "text-color", "#ffffff");
-          map.setPaintProperty(layer.id, "text-halo-color", "rgba(0, 0, 0, 0.85)");
-        }
-      }
-    });
-
-    const userMarker = new maplibregl.Marker();
-    let userMarkerAdded = false;
-
-    const x = document.getElementById("demo");
-    const locationButton = document.getElementById("locationButton");
-    let watchId = null;
-
-    function getLocation() {
-      // If we're already tracking, pressing the button stops tracking.
-      if (watchId !== null) {
-        stopTracking();
-        return;
-      }
-
-      if (navigator.geolocation) {
-        x.textContent = "Requesting location...";
-        watchId = navigator.geolocation.watchPosition(success, error, {
-          enableHighAccuracy: true,
-          maximumAge: 5000,
-          // If the phone cannot get GPS within 10 seconds, call error().
-          timeout: 10000
-        });
-        locationButton.textContent = "Stop tracking";
-      } else {
-        x.textContent = "Geolocation is not supported by this browser.";
-      }
-    }
-
-    function stopTracking() {
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-      }
-      watchId = null;
-      locationButton.textContent = "Use my location";
-      x.textContent = "Location tracking stopped.";
-    }
-
-    function success(position) {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-
-      x.textContent =
-        "Latitude: " + lat.toFixed(5) +
-        ", Longitude: " + lng.toFixed(5);
-
-      // Move the map to the user's location
-      userMarker.setLngLat([lng, lat]);
-      if (!userMarkerAdded) {
-        userMarker.addTo(map);
-        userMarkerAdded = true;
-      }
-      map.easeTo({ center: [lng, lat], zoom: 16 });
-
-      // Send the location to Flask
-      fetch("/location", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ latitude: lat, longitude: lng })
-      })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error("Flask returned HTTP " + response.status);
-          }
-          return response.json();
-        })
-        .then(data => {
-          console.log("Response from calculations.py:", data);
-        })
-        .catch(fetchError => {
-          console.error("Error sending location to Flask:", fetchError);
-        });
-    }
-
-    function error(err) {
-      x.textContent = "Location error " + err.code + ": " + err.message;
-      console.error("Geolocation error:", err);
-
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-      }
-      watchId = null;
-      locationButton.textContent = "Use my location";
-    }
-
-    locationButton.addEventListener("click", getLocation);
-  </script>
 
 </body>
 
