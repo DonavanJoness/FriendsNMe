@@ -26,6 +26,18 @@ WARNING_BUFFER = 25  # meters
 ALERT_BUFFER = 55  # meters
 
 
+# ==================================================
+# LIVE LOCATION STORAGE
+# ==================================================
+
+# Stores the previous GPS location received from
+# the phone. For now this is one phone.
+previous_location = None
+
+# Keeps track of total distance moved.
+total_distance_traveled = 0.0
+
+
 # --------------------------------------------------
 # CONVERT GPS COORDINATES TO X/Y DISTANCE IN METERS
 # --------------------------------------------------
@@ -246,21 +258,171 @@ def spiral_search():
     pass
 
 
+# ==================================================
+# LIVE GPS CALCULATIONS
+# ==================================================
+
+def calculate_movement(
+    old_latitude,
+    old_longitude,
+    new_latitude,
+    new_longitude
+):
+
+    # Treat the old GPS position as (0, 0).
+    # Convert the new GPS position into meters
+    # away from the old position.
+
+    x, y = gps_to_xy(
+        new_latitude,
+        new_longitude,
+        old_latitude,
+        old_longitude
+    )
+
+    # Calculate straight-line movement.
+    distance = distance_from_party(
+        x,
+        y,
+        0,
+        0
+    )
+
+    return distance
+
+
 # --------------------------------------------------
-# MAIN LOCATION ALGORITHM
+# MAIN LIVE LOCATION ALGORITHM
 # --------------------------------------------------
 
 def analyze_location(latitude, longitude):
 
-    # Keep this for the Flask connection.
-    #
-    # Later this function can call the party
-    # detection/wandering functions automatically.
+    global previous_location
+    global total_distance_traveled
+
+    # Make sure incoming values are numbers.
+    latitude = float(latitude)
+    longitude = float(longitude)
+
+    print("\n================================")
+    print("LIVE LOCATION RECEIVED")
+    print("================================")
+
+    print("Latitude:", latitude)
+    print("Longitude:", longitude)
+
+
+    # ----------------------------------------------
+    # FIRST GPS READING
+    # ----------------------------------------------
+
+    if previous_location is None:
+
+        previous_location = {
+            "latitude": latitude,
+            "longitude": longitude
+        }
+
+        print("First GPS position saved.")
+        print("Waiting for movement...")
+
+        return {
+            "latitude": latitude,
+            "longitude": longitude,
+            "distance_moved": 0,
+            "total_distance": 0,
+            "message": "First GPS position saved"
+        }
+
+
+    # ----------------------------------------------
+    # GET PREVIOUS POSITION
+    # ----------------------------------------------
+
+    old_latitude = previous_location["latitude"]
+    old_longitude = previous_location["longitude"]
+
+
+    # ----------------------------------------------
+    # CALCULATE MOVEMENT
+    # ----------------------------------------------
+
+    distance_moved = calculate_movement(
+        old_latitude,
+        old_longitude,
+        latitude,
+        longitude
+    )
+
+
+    # ----------------------------------------------
+    # UPDATE TOTAL DISTANCE
+    # ----------------------------------------------
+
+    total_distance_traveled += distance_moved
+
+
+    # ----------------------------------------------
+    # PRINT RESULTS
+    # ----------------------------------------------
+
+    print(
+        "Previous location:",
+        old_latitude,
+        old_longitude
+    )
+
+    print(
+        "Current location:",
+        latitude,
+        longitude
+    )
+
+    print(
+        "Distance since last update:",
+        round(distance_moved, 2),
+        "meters"
+    )
+
+    print(
+        "Total distance traveled:",
+        round(total_distance_traveled, 2),
+        "meters"
+    )
+
+
+    # ----------------------------------------------
+    # SAVE CURRENT POSITION FOR NEXT UPDATE
+    # ----------------------------------------------
+
+    previous_location = {
+        "latitude": latitude,
+        "longitude": longitude
+    }
+
+
+    # ----------------------------------------------
+    # SEND RESULTS BACK TO FLASK
+    # ----------------------------------------------
 
     return {
-        "latitude_received": latitude,
-        "longitude_received": longitude,
-        "message": "Location received successfully"
+        "latitude": latitude,
+        "longitude": longitude,
+
+        "previous_latitude": old_latitude,
+        "previous_longitude": old_longitude,
+
+        "distance_moved": round(
+            distance_moved,
+            2
+        ),
+
+        "total_distance": round(
+            total_distance_traveled,
+            2
+        ),
+
+        "message": "Live location analyzed successfully"
     }
 
 
@@ -269,10 +431,6 @@ def analyze_location(latitude, longitude):
 # ==================================================
 
 if __name__ == "__main__":
-
-    # --------------------------------------------------
-    # ORIGINAL GPS TEST
-    # --------------------------------------------------
 
     print("\n================================")
     print("GPS CALCULATION TEST")
@@ -306,35 +464,21 @@ if __name__ == "__main__":
         party_y
     )
 
-    # Calculate taxicab distance.
-    taxi_distance = taxicab_distance(
-        party_x,
-        party_y,
-        user_x,
-        user_y
-    )
-
     print(
         "User X:",
-        user_x,
+        round(user_x, 2),
         "meters"
     )
 
     print(
         "User Y:",
-        user_y,
+        round(user_y, 2),
         "meters"
     )
 
     print(
         "Straight-line distance from party:",
-        party_distance,
-        "meters"
-    )
-
-    print(
-        "Taxicab distance:",
-        taxi_distance,
+        round(party_distance, 2),
         "meters"
     )
 
@@ -347,47 +491,32 @@ if __name__ == "__main__":
     print("PARTY DETECTION TEST")
     print("================================")
 
-    # These are fake X/Y positions in meters.
-    #
-    # Users 1, 2, and 3 simulate the three
-    # phones establishing the party.
-    #
-    # Users 4 and 5 simulate people moving
-    # away from the party.
-
     users = [
 
-        # Party phone 1
         {
             "id": 1,
             "x": 0,
             "y": 0
         },
 
-        # Party phone 2
         {
             "id": 2,
             "x": 8,
             "y": 5
         },
 
-        # Party phone 3
         {
             "id": 3,
             "x": -6,
             "y": 4
         },
 
-        # Test phone 4
-        # Should be around the buffer zone.
         {
             "id": 4,
             "x": 40,
             "y": 0
         },
 
-        # Test phone 5
-        # Should be wandering.
         {
             "id": 5,
             "x": 70,
@@ -397,10 +526,7 @@ if __name__ == "__main__":
     ]
 
 
-    # --------------------------------------------------
-    # STEP 1: DETECT PARTY
-    # --------------------------------------------------
-
+    # Detect party members.
     party_users = detect_party_cluster(
         users
     )
@@ -411,17 +537,10 @@ if __name__ == "__main__":
     )
 
 
-    # --------------------------------------------------
-    # STEP 2: PARTY EXISTS?
-    # --------------------------------------------------
-
+    # If enough users exist, calculate party information.
     if len(party_users) >= MIN_PARTY_USERS:
 
         print("\nPARTY DETECTED!")
-
-        # ----------------------------------------------
-        # STEP 3: FIND PARTY CENTER
-        # ----------------------------------------------
 
         party_center = find_party_center(
             party_users
@@ -435,11 +554,6 @@ if __name__ == "__main__":
             round(party_x, 2),
             round(party_y, 2)
         )
-
-
-        # ----------------------------------------------
-        # STEP 4: CALCULATE PARTY RADIUS
-        # ----------------------------------------------
 
         party_radius = calculate_party_radius(
             party_users,
@@ -472,18 +586,12 @@ if __name__ == "__main__":
         )
 
 
-        # ----------------------------------------------
-        # STEP 5: CHECK EVERY USER
-        # ----------------------------------------------
-
         print("\n================================")
         print("USER LOCATION STATUS")
         print("================================")
 
         for user in users:
 
-            # Calculate this person's distance
-            # from the party center.
             distance = distance_from_party(
                 user["x"],
                 user["y"],
@@ -491,7 +599,6 @@ if __name__ == "__main__":
                 party_y
             )
 
-            # Determine which zone they're in.
             status = wandering_status(
                 distance,
                 party_radius
@@ -506,11 +613,6 @@ if __name__ == "__main__":
                 "| Status:",
                 status
             )
-
-
-    # --------------------------------------------------
-    # NO PARTY FOUND
-    # --------------------------------------------------
 
     else:
 
