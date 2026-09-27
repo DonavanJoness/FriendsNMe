@@ -77,21 +77,14 @@ Open the `https://....trycloudflare.com` link it prints on each phone.
 
 How parties work (`server/data/party.py`):
 
-- A party forms when 2+ phones are within 30 m of each other (chains count, so
-  a line of people 20 m apart is one group). Separate groups form separate
-  parties.
+- Parties are formed by users adding there accounts through team form up feature
+  on the website 
 - The circle is the median position of the members inside it, with radius
   1.5 x their median distance from the center (30 to 150 m). Medians mean one
   person walking away can't drag the circle with them.
-- The circle only moves or resizes while 3+ members are inside it; with 2 there
-  is no way to tell who wandered, so it stays where it started. Changes are
-  smoothed over ~30 s, so a group that walks somewhere together takes the
-  circle along.
 - Each phone's GPS accuracy (up to 25 m) is subtracted before calling it
   wandering; readings worse than 100 m are ignored. Locations older than
   2 minutes don't count.
-- Overlapping parties merge. A party ends after 15 minutes without 2 members
-  together. Parties live in memory, so restarting the server clears them.
 - "Leave party" stops you being counted or re-added automatically. The party
   stays on your map in gray, and "Rejoin party" puts you back in as long as
   it's still going.
