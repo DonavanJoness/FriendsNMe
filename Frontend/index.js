@@ -1,6 +1,5 @@
-// Client-side auth flow. There is no backend yet, so the verification code is
-// generated in the browser and shown in the message box (demo mode).
-// Replace sendCode/verifyCode/isUsernameTaken with real API calls later.
+// Client-side auth flow. All account state lives on the Flask server
+// (SQLite + signed session cookie); this file only drives the UI.
 
 const $ = (id) => document.getElementById(id);
 
@@ -33,22 +32,31 @@ const FRIENDS_KEY = "friendsnme.sharedAccounts";
 const TEMPLE_EMAIL = /^[^\s@]+@temple\.edu$/i;
 
 let pendingEmail = "";
-let pendingCode = "";
 
-function readJSON(key, fallback) {
-  try {
-    return JSON.parse(localStorage.getItem(key)) ?? fallback;
-  } catch {
-    return fallback;
+// POST/GET JSON to the Flask API. Same-origin, so the session cookie
+// is sent automatically; "same-origin" makes that explicit.
+async function api(path, body) {
+  const options = { credentials: "same-origin" };
+  if (body !== undefined) {
+    options.method = "POST";
+    options.headers = { "Content-Type": "application/json" };
+    options.body = JSON.stringify(body);
   }
-}
 
-function writeJSON(key, value) {
+  let response;
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    response = await fetch(path, options);
   } catch {
-    /* storage unavailable */
+    throw new Error("Could not reach the server. Is Flask running?");
   }
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data.error || `Server returned HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return data;
 }
 
 function showMessage(text, success = false) {
@@ -105,9 +113,10 @@ function renderFriends() {
 
 function unlock(session) {
   renderFriends();
+function unlock(user) {
   document.body.classList.remove("auth-locked");
   els.overlay.hidden = true;
-  els.badge.textContent = session.username;
+  els.badge.textContent = user.username;
   els.badge.hidden = false;
   els.logout.hidden = false;
 }
@@ -123,13 +132,24 @@ function lock() {
   els.emailSubmit.disabled = true;
   els.codeSubmit.disabled = true;
   els.usernameSubmit.disabled = true;
+  els.subtitle.textContent = "Use your Temple University email to access FriendsNMe.";
   showMessage("");
   showStep("email");
 }
 
-function sendCode() {
-  pendingCode = String(Math.floor(100000 + Math.random() * 900000));
-  showMessage(`Demo mode: your verification code is ${pendingCode}`, true);
+// Disable a button while a request is in flight
+async function withBusy(button, task) {
+  button.disabled = true;
+  try {
+    await task();
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function sendCode() {
+  await api("/api/auth/request-code", { email: pendingEmail });
+  showMessage(`A verification code was sent to ${pendingEmail}.`, true);
 }
 
 // Input validation -> enable/disable buttons
@@ -152,43 +172,66 @@ els.emailForm.addEventListener("submit", (event) => {
     showMessage("Please use a valid @temple.edu email address.");
     return;
   }
-  pendingEmail = email;
-  sendCode();
-  els.subtitle.textContent = `Enter the 6-digit code for ${email}.`;
-  showStep("code");
-  els.code.focus();
+
+  withBusy(els.emailSubmit, async () => {
+    pendingEmail = email;
+    try {
+      await sendCode();
+    } catch (error) {
+      showMessage(error.message);
+      // 429 "please wait" still means a code is out there — let them enter it
+      if (error.status !== 429) return;
+    }
+    els.subtitle.textContent = `Enter the 6-digit code for ${email}.`;
+    showStep("code");
+    els.code.focus();
+  });
 });
 
 // Step 2: code
 els.codeForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  if (els.code.value !== pendingCode) {
-    showMessage("That code is incorrect. Try again or resend the code.");
-    return;
-  }
-  const accounts = readJSON(STORAGE_KEY, {});
-  const existing = accounts[pendingEmail];
-  if (existing) {
-    writeJSON(SESSION_KEY, existing);
+
+  withBusy(els.codeSubmit, async () => {
+    let data;
+    try {
+      data = await api("/api/auth/verify-code", {
+        email: pendingEmail,
+        code: els.code.value,
+      });
+    } catch (error) {
+      showMessage(error.message);
+      return;
+    }
+
+    if (!data.needsUsername) {
+      showMessage("");
+      unlock(data.user);
+      return;
+    }
+
+    els.verifiedEmail.textContent = pendingEmail;
+    els.subtitle.textContent = "Pick a username to finish creating your account.";
     showMessage("");
-    unlock(existing);
-    return;
-  }
-  els.verifiedEmail.textContent = pendingEmail;
-  els.subtitle.textContent = "Pick a username to finish creating your account.";
-  showMessage("");
-  showStep("username");
-  els.username.focus();
+    showStep("username");
+    els.username.focus();
+  });
 });
 
 els.resend.addEventListener("click", () => {
   els.code.value = "";
   els.codeSubmit.disabled = true;
-  sendCode();
+  withBusy(els.resend, async () => {
+    try {
+      await sendCode();
+    } catch (error) {
+      showMessage(error.message);
+    }
+  });
 });
 
 els.changeEmail.addEventListener("click", () => {
-  pendingCode = "";
+  pendingEmail = "";
   els.subtitle.textContent = "Use your Temple University email to access FriendsNMe.";
   showMessage("");
   showStep("email");
@@ -198,28 +241,27 @@ els.changeEmail.addEventListener("click", () => {
 // Step 3: username
 els.usernameForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  const username = els.username.value.trim();
-  const accounts = readJSON(STORAGE_KEY, {});
-  const taken = Object.values(accounts).some(
-    (a) => a.username.toLowerCase() === username.toLowerCase()
-  );
-  if (taken) {
-    showMessage("That username is already taken.");
-    return;
-  }
-  const account = { email: pendingEmail, username };
-  accounts[pendingEmail] = account;
-  writeJSON(STORAGE_KEY, accounts);
-  writeJSON(SESSION_KEY, account);
-  showMessage("");
-  unlock(account);
+
+  withBusy(els.usernameSubmit, async () => {
+    try {
+      const data = await api("/api/auth/complete-signup", {
+        username: els.username.value.trim(),
+      });
+      showMessage("");
+      unlock(data.user);
+    } catch (error) {
+      showMessage(error.message);
+      // Signup window expired on the server — start over
+      if (error.status === 401) showStep("email");
+    }
+  });
 });
 
-els.logout.addEventListener("click", () => {
+els.logout.addEventListener("click", async () => {
   try {
-    localStorage.removeItem(SESSION_KEY);
+    await api("/api/auth/logout", {});
   } catch {
-    /* ignore */
+    /* clear the UI regardless */
   }
   lock();
 });
@@ -234,3 +276,7 @@ renderFriends();
 // Restore an existing session
 const session = readJSON(SESSION_KEY, null);
 if (session?.username) unlock(session);
+// Restore an existing server session on page load
+api("/api/auth/session")
+  .then((data) => unlock(data.user))
+  .catch(() => lock());
