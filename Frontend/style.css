@@ -174,13 +174,53 @@ input {
 }
 
 .nav-menu {
-    list-style: none;
-    padding: 0;
-    list-style-type: none;
-    display: flex;
-    gap: 24px;
-    margin: 0;
-    padding-left: 20px;
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 10px;
+  background: rgb(0 0 0 / 22%);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.nav-item:has(a) {
+  padding: 0;
+}
+
+.nav-item a {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 7px;
+  color: #d9deea;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.nav-item a:hover {
+  background: rgb(255 255 255 / 8%);
+  color: #ffffff;
+}
+
+.nav-item a:focus-visible {
+  outline: 2px solid #f0bac3;
+  outline-offset: 2px;
+}
+
+.nav-item a[aria-current="page"] {
+  background: var(--temple-cherry);
+  color: #ffffff;
 }
 
 .map_canvas {
@@ -521,6 +561,12 @@ input {
 
   .ghost-button {
     padding: 0 10px;
+  }
+
+  .nav-item a {
+    min-height: 30px;
+    padding: 0 9px;
+    font-size: 0.82rem;
   }
 
   .map-shell {
