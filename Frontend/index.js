@@ -21,8 +21,14 @@ const els = {
   verifiedEmail: $("verifiedEmail"),
   badge: $("userBadge"),
   logout: $("logoutButton"),
+  friendsList: $("friendsList"),
+  friendsCount: $("friendsCount"),
 };
 
+const STORAGE_KEY = "friendsnme.accounts";
+const SESSION_KEY = "friendsnme.session";
+// Same list the Sharing page writes to.
+const FRIENDS_KEY = "friendsnme.sharedAccounts";
 const TEMPLE_EMAIL = /^[^\s@]+@temple\.edu$/i;
 
 let pendingEmail = "";
@@ -65,6 +71,48 @@ function showStep(step) {
   els.usernameForm.hidden = step !== "username";
 }
 
+function renderFriends() {
+  const friends = readJSON(FRIENDS_KEY, []);
+  els.friendsList.innerHTML = "";
+  els.friendsCount.textContent = friends.length === 1
+    ? "1 friend"
+    : `${friends.length} friends`;
+
+  if (friends.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty-share-state";
+    empty.textContent = "No friends yet. Add people from the Sharing page.";
+    els.friendsList.appendChild(empty);
+    return;
+  }
+
+  friends.forEach((friend) => {
+    const row = document.createElement("article");
+    row.className = "shared-account-row";
+
+    const info = document.createElement("div");
+    info.className = "friend-info";
+
+    const avatar = document.createElement("span");
+    avatar.className = "friend-avatar";
+    avatar.setAttribute("aria-hidden", "true");
+    avatar.textContent = friend.username.charAt(0).toUpperCase();
+
+    const text = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = friend.username;
+    const email = document.createElement("span");
+    email.textContent = friend.email;
+    text.append(name, email);
+
+    info.append(avatar, text);
+    row.appendChild(info);
+    els.friendsList.appendChild(row);
+  });
+}
+
+function unlock(session) {
+  renderFriends();
 function unlock(user) {
   document.body.classList.remove("auth-locked");
   els.overlay.hidden = true;
@@ -218,6 +266,16 @@ els.logout.addEventListener("click", async () => {
   lock();
 });
 
+// Keep the list in sync if the Sharing page is open in another tab
+window.addEventListener("storage", (event) => {
+  if (event.key === FRIENDS_KEY) renderFriends();
+});
+
+renderFriends();
+
+// Restore an existing session
+const session = readJSON(SESSION_KEY, null);
+if (session?.username) unlock(session);
 // Restore an existing server session on page load
 api("/api/auth/session")
   .then((data) => unlock(data.user))
