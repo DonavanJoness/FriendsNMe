@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FriendsNME</title>
   <link rel="stylesheet" href="./style.css" />
+  <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+  <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
   <script src="./index.js" defer></script>
 </head>
 
@@ -31,14 +33,7 @@
   </header>
 
   <main id="app" class="map-shell" aria-label="FriendsNMe map">
-    <gmp-map
-      class="map_canvas"
-      center="39.9800,-75.1600"
-      zoom="14"
-      map-id="DEMO_MAP_ID"
-      color-scheme="DARK"
-    >
-    </gmp-map>
+    <div id="map" class="map_canvas"></div>
     <div class="location-controls">
       <button id="locationButton" class="primary-button" type="button">Use my location</button>
       <p id="demo" class="field-hint" aria-live="polite"></p>
@@ -107,12 +102,28 @@
   <!--
     The `defer` attribute causes the script to execute after the full HTML
     document has been parsed. -->
-<script
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBx1piCOFQYkBt1I2qn-ghUuLRu2QXQhm8&libraries=maps&v=weekly"
-  defer
-></script>
-
 <script>
+  // OpenFreeMap (MapLibre GL) — MapLibre uses [lng, lat] order
+  const map = new maplibregl.Map({
+    container: "map",
+    style: "https://tiles.openfreemap.org/styles/dark",
+    center: [-75.16, 39.98],
+    zoom: 14
+  });
+  map.addControl(new maplibregl.NavigationControl());
+
+  // Make all labels (street names, places, etc.) white
+  map.on("load", () => {
+    for (const layer of map.getStyle().layers) {
+      if (layer.type === "symbol" && layer.layout && layer.layout["text-field"]) {
+        map.setPaintProperty(layer.id, "text-color", "#ffffff");
+        map.setPaintProperty(layer.id, "text-halo-color", "rgba(0, 0, 0, 0.85)");
+      }
+    }
+  });
+  const userMarker = new maplibregl.Marker();
+  let userMarkerAdded = false;
+
   const x = document.getElementById("demo");
 
   const locationButton = document.getElementById("locationButton");
@@ -151,17 +162,13 @@ function success(position) {
     "Latitude: " + lat.toFixed(5) +
     ", Longitude: " + lng.toFixed(5);
 
-  // Move Google Maps to the iPhone's location
-  const map = document.querySelector("gmp-map");
-
-  if (map) {
-    map.center = {
-      lat: lat,
-      lng: lng
-    };
-
-    map.zoom = 16;
+  // Move the map to the user's location
+  userMarker.setLngLat([lng, lat]);
+  if (!userMarkerAdded) {
+    userMarker.addTo(map);
+    userMarkerAdded = true;
   }
+  map.easeTo({ center: [lng, lat], zoom: 16 });
 
   // Send the iPhone's location to Flask
   fetch("/location", {
