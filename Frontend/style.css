@@ -114,11 +114,63 @@ input {
 }
 
 .map-shell {
-  display: block;
-  width: 500px;
+  display: grid;
+  grid-template-columns: minmax(0, 500px) minmax(0, 300px);
+  align-items: start;
+  justify-content: center;
+  gap: 20px;
+  width: min(100% - 32px, 820px);
   min-height: 500px;
   margin: 20px auto;
   margin-top: 150px;
+}
+
+.friends-panel {
+  max-height: 420px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.friends-list {
+  overflow-y: auto;
+  align-content: start;
+}
+
+.friend-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.friend-info > div {
+  min-width: 0;
+}
+
+.friend-info strong,
+.friend-info span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-avatar {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--temple-cherry);
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.friends-manage {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
 }
 
 .nav-menu {
@@ -422,6 +474,20 @@ input {
 .auth-message[hidden],
 .auth-form[hidden] {
   display: none;
+}
+
+@media (max-width: 860px) {
+  body {
+    overflow: auto;
+  }
+
+  .map-shell {
+    grid-template-columns: minmax(0, 500px);
+  }
+
+  .friends-panel {
+    max-height: none;
+  }
 }
 
 @media (max-width: 560px) {
