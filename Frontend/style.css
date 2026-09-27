@@ -45,7 +45,7 @@ input {
   gap: 16px;
   min-height: 76px;
   padding: 14px clamp(16px, 4vw, 40px);
-  background: linear-gradient(180deg, rgb(17 19 24 / 92%), rgb(17 19 24 / 56%) 72%, transparent);
+  background-color: #353131;
 }
 
 .header {
@@ -57,7 +57,7 @@ input {
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    background-color:#98a1b3
+    background-color:#2e2f31;
 }
 
 .site-header h1 {

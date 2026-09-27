@@ -16,12 +16,7 @@
 
 <body class="auth-locked">
 
-  <!-- ==================================================
-       HEADER
-       ================================================== -->
-
   <header class="site-header">
-
     <div>
       <p class="eyebrow">Temple University</p>
       <h1>FriendsNMe</h1>
@@ -47,72 +42,36 @@
 
 
     <div class="nav-container">
-
       <nav>
-
         <ul class="nav-menu">
-
-          <li class="nav-item">
-            Home
+          <li class="nav-item"><a href = "index.html">Home</a></li>
+          <li class="nav-item"><a href="https://github.com/giowassheree/FriendsNMe">GitHub</a></li>
+          <li class="nav-item"><a href="sharing.html">Sharing</a>
           </li>
-
-          <li class="nav-item">
-            <a href="https://github.com/giowassheree/FriendsNMe">
-              GitHub
-            </a>
-          </li>
-
-          <li class="nav-item">
-            <a href="sharing.html">
-              Sharing
-            </a>
-          </li>
-
         </ul>
-
       </nav>
-
     </div>
-
   </header>
-
-  <!-- ==================================================
-       MAP
-       ================================================== -->
 
   <main
     id="app"
     class="map-shell"
     aria-label="FriendsNMe map">
-
     <div id="map" class="map_canvas"></div>
-
-
-    <!-- LOCATION BUTTON -->
-
     <div class="location-controls">
-
       <button
         id="locationButton"
         class="primary-button"
         type="button">
         Use my location
       </button>
-
       <p
         id="demo"
         class="field-hint"
         aria-live="polite">
       </p>
-
     </div>
-
   </main>
-
-
-  <!-- ==================================================
-       AUTHENTICATION
-       ================================================== -->
 
   <div
     id="authOverlay"
@@ -120,23 +79,17 @@
     role="dialog"
     aria-modal="true"
     aria-labelledby="authTitle">
-
     <section class="auth-modal">
-
       <div class="modal-heading">
-
         <p class="eyebrow">
           Secure access
         </p>
-
         <h2 id="authTitle">
           Temple sign in
         </h2>
-
         <p id="authSubtitle">
           Use your Temple University email to access FriendsNMe.
         </p>
-
       </div>
 
 
@@ -146,8 +99,6 @@
         hidden>
       </div>
 
-
-      <!-- EMAIL FORM -->
 
       <form
         id="emailForm"
@@ -187,9 +138,6 @@
 
       </form>
 
-
-      <!-- VERIFICATION CODE -->
-
       <form
         id="codeForm"
         class="auth-form"
@@ -209,7 +157,6 @@
           placeholder="000000"
           required
         />
-
         <button
           id="codeSubmit"
           class="primary-button"
@@ -220,18 +167,11 @@
 
         </button>
 
-
         <div class="inline-actions">
-
           <button
             id="resendCode"
             class="link-button"
-            type="button">
-
-            Resend code
-
-          </button>
-
+            type="button">Resend code</button>
 
           <button
             id="changeEmail"
@@ -241,13 +181,8 @@
             Change email
 
           </button>
-
         </div>
-
       </form>
-
-
-      <!-- USERNAME -->
 
       <form
         id="usernameForm"
@@ -256,18 +191,13 @@
         hidden>
 
         <p class="verified-line">
-
           Verified
-
           <strong id="verifiedEmail"></strong>
-
         </p>
-
 
         <label for="username">
           Username
         </label>
-
 
         <input
           id="username"
@@ -278,11 +208,8 @@
           required
         />
 
-
         <p class="field-hint">
-
           Usernames are unique and checked against registered accounts.
-
         </p>
 
 
@@ -295,11 +222,8 @@
           Create account
 
         </button>
-
       </form>
-
     </section>
-
   </div>
 
 
