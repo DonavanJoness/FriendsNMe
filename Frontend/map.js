@@ -118,10 +118,22 @@ function timeAgo(seconds) {
 // TRACKING MY LOCATION
 // ==================================================
 
+// GPS can take well over 10 s indoors or on a laptop, so a timeout
+// only means "no reading yet": we keep watching instead of stopping.
+const WATCH_OPTIONS = { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 };
+// One quick, less exact reading (Wi-Fi / cell towers) so the map
+// shows something while GPS warms up.
+const QUICK_FIX_OPTIONS = { enableHighAccuracy: false, maximumAge: 60000, timeout: 15000 };
+
 const userMarker = new maplibregl.Marker();
 let userMarkerAdded = false;
 let watchId = null;
+let hasFix = false;
 let lastSent = null;
+
+function startWatch() {
+  watchId = navigator.geolocation.watchPosition(success, error, WATCH_OPTIONS);
+}
 
 function getLocation() {
   // If we're already tracking, pressing the button stops tracking.
@@ -143,12 +155,17 @@ function getLocation() {
   }
 
   mapEls.locationText.textContent = "Requesting location...";
-  watchId = navigator.geolocation.watchPosition(success, error, {
-    enableHighAccuracy: true,
-    maximumAge: 5000,
-    // If the phone cannot get GPS within 10 seconds, call error().
-    timeout: 10000,
-  });
+  startWatch();
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      // Ignore it if GPS already answered or tracking was stopped.
+      if (!hasFix && watchId !== null) success(position);
+    },
+    () => {
+      /* the watch reports real problems */
+    },
+    QUICK_FIX_OPTIONS
+  );
   mapEls.locationButton.textContent = "Stop tracking";
 }
 
@@ -157,6 +174,7 @@ function stopTracking(message = "Location tracking stopped.") {
     navigator.geolocation.clearWatch(watchId);
   }
   watchId = null;
+  hasFix = false;
   lastSent = null;
   mapEls.locationButton.textContent = "Use my location";
   mapEls.locationText.textContent = message;
@@ -169,6 +187,7 @@ function success(position) {
     accuracy: position.coords.accuracy,
   };
 
+  hasFix = true;
   mapEls.locationText.textContent =
     `Sharing your location (accurate to about ${Math.round(current.accuracy)} m).`;
 
@@ -198,7 +217,31 @@ function success(position) {
 
 function error(err) {
   console.error("Geolocation error:", err);
-  stopTracking(`Location error ${err.code}: ${err.message}`);
+
+  if (err.code === err.TIMEOUT) {
+    // Not a failure: no new reading yet. Restart the watch in case
+    // the browser ended it, and keep the last location on the map.
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    startWatch();
+    if (!hasFix) {
+      mapEls.locationText.textContent =
+        "Still looking for your location... Moving near a window or outside helps.";
+    }
+    return;
+  }
+
+  if (err.code === err.PERMISSION_DENIED) {
+    stopTracking(
+      "Location permission is blocked. Allow location for this site in your browser settings, then try again."
+    );
+    return;
+  }
+
+  // POSITION_UNAVAILABLE: the device couldn't work out a location.
+  stopTracking(
+    "Your device couldn't find a location. Make sure Location is turned on " +
+      "(on Windows: Settings > Privacy & security > Location), then try again."
+  );
 }
 
 mapEls.locationButton.addEventListener("click", getLocation);
