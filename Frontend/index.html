@@ -1,62 +1,168 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <title>FriendsNME</title>
+
   <link rel="stylesheet" href="./style.css" />
   <script src="./index.js" defer></script>
 </head>
 
+
 <body class="auth-locked">
+
+  <!-- ==================================================
+       HEADER
+       ================================================== -->
+
   <header class="site-header">
+
     <div>
       <p class="eyebrow">Temple University</p>
       <h1>FriendsNMe</h1>
     </div>
+
     <div class="session-controls">
-      <span id="userBadge" class="user-badge" hidden></span>
-      <button id="logoutButton" class="ghost-button" type="button" hidden>Sign out</button>
+
+      <span
+        id="userBadge"
+        class="user-badge"
+        hidden>
+      </span>
+
+      <button
+        id="logoutButton"
+        class="ghost-button"
+        type="button"
+        hidden>
+        Sign out
+      </button>
+
     </div>
 
-    <div class = "nav-container">
+
+    <div class="nav-container">
+
       <nav>
-        <ul class = "nav-menu">
-          <li class = "nav-item">Home</li>
-          <li class = "nav-item"><a href = "https://github.com/giowassheree/FriendsNMe">GitHub</a></li>
-          <li class = "nav-item"><a href = "sharing.html">Sharing</a></li>
+
+        <ul class="nav-menu">
+
+          <li class="nav-item">
+            Home
+          </li>
+
+          <li class="nav-item">
+            <a href="https://github.com/giowassheree/FriendsNMe">
+              GitHub
+            </a>
+          </li>
+
+          <li class="nav-item">
+            <a href="sharing.html">
+              Sharing
+            </a>
+          </li>
+
         </ul>
+
       </nav>
+
     </div>
+
   </header>
 
-  <main id="app" class="map-shell" aria-label="FriendsNMe map">
+
+  <!-- ==================================================
+       MAP
+       ================================================== -->
+
+  <main
+    id="app"
+    class="map-shell"
+    aria-label="FriendsNMe map">
+
     <gmp-map
       class="map_canvas"
       center="39.9800,-75.1600"
       zoom="14"
       map-id="DEMO_MAP_ID"
-      color-scheme="DARK"
-    >
+      color-scheme="DARK">
     </gmp-map>
+
+
+    <!-- LOCATION BUTTON -->
+
     <div class="location-controls">
-      <button id="locationButton" class="primary-button" type="button">Use my location</button>
-      <p id="demo" class="field-hint" aria-live="polite"></p>
+
+      <button
+        id="locationButton"
+        class="primary-button"
+        type="button">
+        Use my location
+      </button>
+
+      <p
+        id="demo"
+        class="field-hint"
+        aria-live="polite">
+      </p>
+
     </div>
+
   </main>
 
-  <div id="authOverlay" class="auth-overlay" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+
+  <!-- ==================================================
+       AUTHENTICATION
+       ================================================== -->
+
+  <div
+    id="authOverlay"
+    class="auth-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="authTitle">
+
     <section class="auth-modal">
+
       <div class="modal-heading">
-        <p class="eyebrow">Secure access</p>
-        <h2 id="authTitle">Temple sign in</h2>
-        <p id="authSubtitle">Use your Temple University email to access FriendsNMe.</p>
+
+        <p class="eyebrow">
+          Secure access
+        </p>
+
+        <h2 id="authTitle">
+          Temple sign in
+        </h2>
+
+        <p id="authSubtitle">
+          Use your Temple University email to access FriendsNMe.
+        </p>
+
       </div>
 
-      <div id="authMessage" class="auth-message" hidden></div>
 
-      <form id="emailForm" class="auth-form" novalidate>
-        <label for="templeEmail">Temple email</label>
+      <div
+        id="authMessage"
+        class="auth-message"
+        hidden>
+      </div>
+
+
+      <!-- EMAIL FORM -->
+
+      <form
+        id="emailForm"
+        class="auth-form"
+        novalidate>
+
+        <label for="templeEmail">
+          Temple email
+        </label>
+
         <input
           id="templeEmail"
           type="email"
@@ -65,12 +171,40 @@
           placeholder="you@temple.edu"
           required
         />
-        <p id="emailHint" class="field-hint">Enter your @temple.edu email address.</p>
-        <button id="emailSubmit" class="primary-button" type="submit" disabled>Send verification code</button>
+
+        <p
+          id="emailHint"
+          class="field-hint">
+
+          Enter your @temple.edu email address.
+
+        </p>
+
+        <button
+          id="emailSubmit"
+          class="primary-button"
+          type="submit"
+          disabled>
+
+          Send verification code
+
+        </button>
+
       </form>
 
-      <form id="codeForm" class="auth-form" novalidate hidden>
-        <label for="verificationCode">Verification code</label>
+
+      <!-- VERIFICATION CODE -->
+
+      <form
+        id="codeForm"
+        class="auth-form"
+        novalidate
+        hidden>
+
+        <label for="verificationCode">
+          Verification code
+        </label>
+
         <input
           id="verificationCode"
           type="text"
@@ -80,16 +214,66 @@
           placeholder="000000"
           required
         />
-        <button id="codeSubmit" class="primary-button" type="submit" disabled>Verify code</button>
+
+        <button
+          id="codeSubmit"
+          class="primary-button"
+          type="submit"
+          disabled>
+
+          Verify code
+
+        </button>
+
+
         <div class="inline-actions">
-          <button id="resendCode" class="link-button" type="button">Resend code</button>
-          <button id="changeEmail" class="link-button" type="button">Change email</button>
+
+          <button
+            id="resendCode"
+            class="link-button"
+            type="button">
+
+            Resend code
+
+          </button>
+
+
+          <button
+            id="changeEmail"
+            class="link-button"
+            type="button">
+
+            Change email
+
+          </button>
+
         </div>
+
       </form>
 
-      <form id="usernameForm" class="auth-form" novalidate hidden>
-        <p class="verified-line">Verified <strong id="verifiedEmail"></strong></p>
-        <label for="username">Username</label>
+
+      <!-- USERNAME -->
+
+      <form
+        id="usernameForm"
+        class="auth-form"
+        novalidate
+        hidden>
+
+        <p class="verified-line">
+
+          Verified
+
+          <strong id="verifiedEmail"></strong>
+
+        </p>
+
+
+        <label for="username">
+          Username
+        </label>
+
+
         <input
           id="username"
           type="text"
@@ -98,95 +282,304 @@
           placeholder="Choose a username"
           required
         />
-        <p class="field-hint">Usernames are unique and checked against registered accounts.</p>
-        <button id="usernameSubmit" class="primary-button" type="submit" disabled>Create account</button>
+
+
+        <p class="field-hint">
+
+          Usernames are unique and checked against registered accounts.
+
+        </p>
+
+
+        <button
+          id="usernameSubmit"
+          class="primary-button"
+          type="submit"
+          disabled>
+
+          Create account
+
+        </button>
+
       </form>
+
     </section>
+
   </div>
 
-  <!--
-    The `defer` attribute causes the script to execute after the full HTML
-    document has been parsed. -->
-<script
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBx1piCOFQYkBt1I2qn-ghUuLRu2QXQhm8&libraries=maps&v=weekly"
-  defer
-></script>
 
-<script>
-  const x = document.getElementById("demo");
+  <!-- ==================================================
+       GOOGLE MAPS
+       ================================================== -->
 
-  const locationButton = document.getElementById("locationButton");
-  let watchId = null;
+  <script
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBx1piCOFQYkBt1I2qn-ghUuLRu2QXQhm8&libraries=maps&v=weekly"
+    defer>
+  </script>
 
-  function getLocation() {
-    if (watchId !== null) {
-      stopTracking();
-      return;
+
+  <!-- ==================================================
+       IPHONE LOCATION
+       ================================================== -->
+
+  <script>
+
+    const x = document.getElementById("demo");
+
+    const locationButton =
+      document.getElementById("locationButton");
+
+    let watchId = null;
+
+
+    // --------------------------------------------------
+    // START LOCATION TRACKING
+    // --------------------------------------------------
+
+    function getLocation() {
+
+      // If we're already tracking,
+      // pressing the button stops tracking.
+
+      if (watchId !== null) {
+
+        stopTracking();
+
+        return;
+      }
+
+
+      // Make sure browser supports GPS.
+
+      if (navigator.geolocation) {
+
+        x.textContent =
+          "Requesting location...";
+
+
+        watchId =
+          navigator.geolocation.watchPosition(
+
+            success,
+
+            error,
+
+            {
+              enableHighAccuracy: true,
+
+              maximumAge: 5000,
+
+              // If the phone cannot get GPS
+              // within 10 seconds, call error().
+              timeout: 10000
+            }
+
+          );
+
+
+        locationButton.textContent =
+          "Stop tracking";
+
+      }
+
+      else {
+
+        x.textContent =
+          "Geolocation is not supported by this browser.";
+
+      }
+
     }
-    if (navigator.geolocation) {
-      x.textContent = "Requesting location...";
-      watchId = navigator.geolocation.watchPosition(success, error, {
-        enableHighAccuracy: true,
-        maximumAge: 5000
+
+
+
+    // --------------------------------------------------
+    // STOP LOCATION TRACKING
+    // --------------------------------------------------
+
+    function stopTracking() {
+
+      if (watchId !== null) {
+
+        navigator.geolocation.clearWatch(watchId);
+
+      }
+
+
+      watchId = null;
+
+
+      locationButton.textContent =
+        "Use my location";
+
+
+      x.textContent =
+        "Location tracking stopped.";
+
+    }
+
+
+
+    // --------------------------------------------------
+    // LOCATION SUCCESS
+    // --------------------------------------------------
+
+    function success(position) {
+
+      const lat =
+        position.coords.latitude;
+
+      const lng =
+        position.coords.longitude;
+
+
+      // Display coordinates on the website.
+
+      x.textContent =
+        "Latitude: " +
+        lat.toFixed(5) +
+        ", Longitude: " +
+        lng.toFixed(5);
+
+
+
+      // -----------------------------------------------
+      // MOVE GOOGLE MAP TO IPHONE
+      // -----------------------------------------------
+
+      const map =
+        document.querySelector("gmp-map");
+
+
+      if (map) {
+
+        map.center = {
+          lat: lat,
+          lng: lng
+        };
+
+
+        map.zoom = 16;
+
+      }
+
+
+
+      // -----------------------------------------------
+      // SEND LOCATION TO FLASK
+      // -----------------------------------------------
+
+      fetch("/location", {
+
+        method: "POST",
+
+        headers: {
+
+          "Content-Type":
+            "application/json"
+
+        },
+
+        body: JSON.stringify({
+
+          latitude: lat,
+
+          longitude: lng
+
+        })
+
+      })
+
+
+      .then(response => {
+
+        if (!response.ok) {
+
+          throw new Error(
+            "Flask returned HTTP " +
+            response.status
+          );
+
+        }
+
+        return response.json();
+
+      })
+
+
+      .then(data => {
+
+        console.log(
+          "Response from calculations.py:",
+          data
+        );
+
+      })
+
+
+      .catch(fetchError => {
+
+        console.error(
+          "Error sending location to Flask:",
+          fetchError
+        );
+
       });
-      locationButton.textContent = "Stop tracking";
-    } else {
-      x.textContent = "Geolocation is not supported by this browser";
+
     }
-  }
 
-  function stopTracking() {
-    navigator.geolocation.clearWatch(watchId);
-    watchId = null;
-    locationButton.textContent = "Use my location";
-    x.textContent = "Location tracking stopped.";
-  }
 
-function success(position) {
-  const lat = position.coords.latitude;
-  const lng = position.coords.longitude;
 
-  // Display the iPhone's location
-  x.textContent =
-    "Latitude: " + lat.toFixed(5) +
-    ", Longitude: " + lng.toFixed(5);
+    // --------------------------------------------------
+    // LOCATION ERROR
+    // --------------------------------------------------
 
-  // Move Google Maps to the iPhone's location
-  const map = document.querySelector("gmp-map");
+    function error(err) {
 
-  if (map) {
-    map.center = {
-      lat: lat,
-      lng: lng
-    };
+      x.textContent =
+        "Location error " +
+        err.code +
+        ": " +
+        err.message;
 
-    map.zoom = 16;
-  }
 
-  // Send the iPhone's location to Flask
-  fetch("/location", {
-    method: "POST",
+      console.error(
+        "Geolocation error:",
+        err
+      );
 
-    headers: {
-      "Content-Type": "application/json"
-    },
 
-    body: JSON.stringify({
-      latitude: lat,
-      longitude: lng
-    })
-  })
-  .then(response => response.json())
-  .then(data => {
-    console.log("Response from calculations.py:", data);
-  })
-  .catch(error => {
-    console.error("Error sending location:", error);
-  });
-}
+      if (watchId !== null) {
 
-  locationButton.addEventListener("click", getLocation);
-</script>
+        navigator.geolocation.clearWatch(
+          watchId
+        );
+
+      }
+
+
+      watchId = null;
+
+
+      locationButton.textContent =
+        "Use my location";
+
+    }
+
+
+
+    // --------------------------------------------------
+    // LOCATION BUTTON
+    // --------------------------------------------------
+
+    locationButton.addEventListener(
+      "click",
+      getLocation
+    );
+
+  </script>
+
 
 </body>
+
 </html>
