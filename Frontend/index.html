@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="./style.css" />
   <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
   <script src="./index.js" defer></script>
+  <script src="./alerts.js" defer></script>
   <script src="./map.js" defer></script>
 </head>
 
@@ -53,6 +54,16 @@
       </nav>
     </div>
   </header>
+
+  <div
+    id="alertToast"
+    class="alert-toast"
+    data-tone="wandering"
+    role="alert"
+    hidden>
+    <strong id="alertToastTitle"></strong>
+    <span id="alertToastBody"></span>
+  </div>
 
   <main
     id="app"
@@ -98,6 +109,14 @@
             Rejoin party
           </button>
         </section>
+
+        <button
+          id="alertsButton"
+          class="link-button alerts-button"
+          type="button"
+          hidden>
+          Turn on phone notifications for wandering alerts
+        </button>
       </div>
     </div>
 

@@ -401,6 +401,46 @@ input {
   line-height: 1.35;
 }
 
+.alerts-button {
+  margin-top: 8px;
+  color: #f0bac3;
+  font-size: 0.88rem;
+  text-align: left;
+}
+
+/* Wandering alert banner (alerts.js); tap to dismiss */
+.alert-toast {
+  position: fixed;
+  z-index: 15;
+  top: 92px;
+  left: 50%;
+  display: grid;
+  gap: 2px;
+  width: min(100% - 32px, 460px);
+  padding: 12px 16px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-left: 5px solid var(--tone);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 18px 44px rgb(0 0 0 / 50%);
+  color: var(--ink);
+  cursor: pointer;
+  transform: translateX(-50%);
+}
+
+.alert-toast[hidden] {
+  display: none;
+}
+
+.alert-toast strong {
+  color: var(--tone);
+}
+
+.alert-toast span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
 .friend-marker {
   display: grid;
   place-items: center;
