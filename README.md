@@ -1,6 +1,7 @@
 # FriendsNMe
-
-
+The purpose of friendNMe is to help temple studets keep track of there friends during parties off campus
+using a website friendsNMe gathers the location from devices and allows user to create partys with other users
+and if one of the party members being to move away from the party the other members will recive an alert
 Roles 
 Main algorithm- this will be where calculations will be done for a user's gps location given from the website 
               - accounts and a buddy system (someone spli
