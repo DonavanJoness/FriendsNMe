@@ -42,6 +42,21 @@ class User(db.Model):
         }
 
 
+class LocationShare(db.Model):
+    # owner shares their location with viewer. One direction only:
+    # each person decides who can see them.
+    __tablename__ = "location_shares"
+    __table_args__ = (db.UniqueConstraint("owner_id", "viewer_id"),)
+
+    id = db.Column(db.String, primary_key=True, default=generate_uuid)
+
+    owner_id = db.Column(db.String, db.ForeignKey("users.id"), nullable=False, index=True)
+
+    viewer_id = db.Column(db.String, db.ForeignKey("users.id"), nullable=False, index=True)
+
+    created_at = db.Column(db.DateTime(timezone=True), default=utc_now)
+
+
 class VerificationCode(db.Model):
     __tablename__ = "verification_codes"
 

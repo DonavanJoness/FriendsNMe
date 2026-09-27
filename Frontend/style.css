@@ -13,7 +13,19 @@
   --soft: #1b1e25;
   --error: #ff8a80;
   --success: #5fd99a;
+  /* Party status colors (map.js reads these for the circle too) */
+  --status-inside: #5fd99a;
+  --status-buffer: #f5c451;
+  --status-wandering: #ff9f43;
+  --status-far: #ff6b6b;
+  --status-none: #98a1b3;
 }
+
+[data-tone="inside"] { --tone: var(--status-inside); }
+[data-tone="buffer"] { --tone: var(--status-buffer); }
+[data-tone="wandering"] { --tone: var(--status-wandering); }
+[data-tone="far"] { --tone: var(--status-far); }
+[data-tone="none"] { --tone: var(--status-none); }
 
 body {
   min-height: 100vh;
@@ -127,10 +139,12 @@ input {
 
 .friends-panel {
   max-height: 420px;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .friends-list {
+  grid-template-columns: minmax(0, 1fr);
   overflow-y: auto;
   align-content: start;
 }
@@ -151,6 +165,11 @@ input {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Block so long status lines end in "..." (not the avatar span) */
+.friend-info > div > span {
+  display: block;
 }
 
 .friend-avatar {
@@ -354,6 +373,88 @@ input {
   margin-top: 14px;
 }
 
+.party-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-left: 4px solid var(--tone);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 4%);
+}
+
+.party-status[hidden] {
+  display: none;
+}
+
+.party-status strong {
+  display: block;
+  color: var(--tone);
+}
+
+.party-status span {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.friend-marker {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--tone, var(--status-none));
+  border-radius: 50%;
+  background: var(--temple-cherry);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 45%);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.friend-row {
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.friend-row:not(:disabled):hover {
+  border-color: rgb(255 255 255 / 30%);
+}
+
+.friend-row:disabled {
+  cursor: default;
+}
+
+.friend-row .friend-avatar {
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--tone);
+}
+
+.is-stale {
+  opacity: 0.55;
+}
+
+.maplibregl-popup-content {
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: var(--panel);
+}
+
+.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: var(--panel);
+}
+
 .sharing-panel {
   display: grid;
   gap: 14px;
@@ -480,6 +581,12 @@ input {
 
 .share-remove-button {
   color: #fecaca;
+}
+
+.share-add-button:disabled,
+.share-remove-button:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 
 .inline-actions {

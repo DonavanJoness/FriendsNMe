@@ -1,8 +1,6 @@
-// Frontend-only sharing demo.
-// The database team can replace getAccounts() with a real API call later.
-
-const ACCOUNTS_KEY = "friendsnme.accounts";
-const SHARED_KEY = "friendsnme.sharedAccounts";
+// Location sharing: choose who can see your location on their map.
+// Sharing is one-way. Adding someone lets them see you; you see them
+// only if they add you too.
 
 const searchForm = document.getElementById("shareSearchForm");
 const searchInput = document.getElementById("shareSearch");
@@ -11,113 +9,143 @@ const statusText = document.getElementById("shareStatus");
 const resultsBox = document.getElementById("shareResults");
 const sharedBox = document.getElementById("sharedAccounts");
 
-function readJSON(key, fallback) {
+let lastResults = [];
+
+// JSON request to the Flask API; the session cookie comes along.
+async function api(path, { method = "GET", body } = {}) {
+  const options = { method, credentials: "same-origin" };
+  if (body !== undefined) {
+    options.headers = { "Content-Type": "application/json" };
+    options.body = JSON.stringify(body);
+  }
+
+  let response;
   try {
-    return JSON.parse(localStorage.getItem(key)) || fallback;
+    response = await fetch(path, options);
   } catch {
-    return fallback;
+    throw new Error("Could not reach the server. Is Flask running?");
   }
-}
 
-function saveJSON(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-function getAccounts() {
-  // Temporary local data. Later this should come from the database.
-  return Object.values(readJSON(ACCOUNTS_KEY, {}));
-}
-
-function getSharedList() {
-  return readJSON(SHARED_KEY, []);
-}
-
-function saveSharedList(list) {
-  saveJSON(SHARED_KEY, list);
-}
-
-function accountMatchesSearch(account, searchText) {
-  const username = account.username.toLowerCase();
-  const email = account.email.toLowerCase();
-  return username.includes(searchText) || email.includes(searchText);
-}
-
-function searchAccounts(searchText) {
-  const lowerSearch = searchText.toLowerCase();
-  return getAccounts().filter((account) => accountMatchesSearch(account, lowerSearch));
-}
-function addShare(account) {
-  const sharedList = getSharedList();
-  const alreadyAdded = sharedList.some((person) => person.email === account.email);
-
-  if (!alreadyAdded) {
-    sharedList.push(account);
-    saveSharedList(sharedList);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data.error || `Server returned HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
+  return data;
 }
 
-function removeShare(email) {
-  const updatedList = getSharedList().filter((person) => person.email !== email);
-  saveSharedList(updatedList);
+function showError(error) {
+  if (error.status === 401) {
+    statusText.textContent = "Sign in on the Home page to manage sharing.";
+    searchInput.disabled = true;
+    searchButton.disabled = true;
+    return;
+  }
+  statusText.textContent = error.message;
+}
+
+// Build elements with textContent, never innerHTML, so a username
+// like "<img onerror=...>" is shown as text instead of running.
+function emptyState(text) {
+  const empty = document.createElement("p");
+  empty.className = "empty-share-state";
+  empty.textContent = text;
+  return empty;
+}
+
+function accountCard(account, detail, cardClass, button) {
+  const card = document.createElement("article");
+  card.className = cardClass;
+
+  const text = document.createElement("div");
+  const name = document.createElement("strong");
+  name.textContent = account.username;
+  const info = document.createElement("span");
+  info.textContent = detail;
+  text.append(name, info);
+
+  card.append(text, button);
+  return card;
+}
+
+function makeButton(className, label, onClick) {
+  const button = document.createElement("button");
+  button.className = className;
+  button.type = "button";
+  button.textContent = label;
+  button.addEventListener("click", onClick);
+  return button;
 }
 
 function showResults(accounts) {
-  resultsBox.innerHTML = "";
+  lastResults = accounts;
+  resultsBox.replaceChildren();
 
   if (accounts.length === 0) {
-    resultsBox.innerHTML = '<p class="empty-share-state">No matching accounts found.</p>';
+    resultsBox.appendChild(emptyState("No matching accounts found."));
     return;
   }
 
   accounts.forEach((account) => {
-    const card = document.createElement("article");
-    card.className = "share-account-card";
-    card.innerHTML = `
-      <div>
-        <strong>${account.username}</strong>
-        <span>${account.email}</span>
-      </div>
-      <button class="share-add-button" type="button">Add</button>
-    `;
-
-    card.querySelector("button").addEventListener("click", () => {
-      addShare(account);
-      statusText.textContent = "Sharing location with " + account.username + ".";
-      showSharedList();
+    const button = makeButton("share-add-button", account.sharing ? "Sharing" : "Share", () => {
+      button.disabled = true;
+      api("/api/shares", { method: "POST", body: { userId: account.id } })
+        .then(() => {
+          account.sharing = true;
+          statusText.textContent = `${account.username} can now see your location.`;
+          showResults(lastResults);
+          loadSharedList();
+        })
+        .catch((error) => {
+          button.disabled = false;
+          showError(error);
+        });
     });
+    button.disabled = account.sharing;
 
-    resultsBox.appendChild(card);
+    const detail = account.sharing ? "Can see your location" : "Can't see your location";
+    resultsBox.appendChild(accountCard(account, detail, "share-account-card", button));
   });
 }
 
-function showSharedList() {
-  const sharedList = getSharedList();
-  sharedBox.innerHTML = "";
+function showSharedList(accounts) {
+  sharedBox.replaceChildren();
 
-  if (sharedList.length === 0) {
-    sharedBox.innerHTML = '<p class="empty-share-state">You are not sharing with anyone yet.</p>';
+  if (accounts.length === 0) {
+    sharedBox.appendChild(emptyState("You are not sharing with anyone yet."));
     return;
   }
 
-  sharedList.forEach((account) => {
-    const row = document.createElement("article");
-    row.className = "shared-account-row";
-    row.innerHTML = `
-      <div>
-        <strong>${account.username}</strong>
-        <span>${account.email}</span>
-      </div>
-      <button class="share-remove-button" type="button">Remove</button>
-    `;
-
-    row.querySelector("button").addEventListener("click", () => {
-      removeShare(account.email);
-      statusText.textContent = "Stopped sharing with " + account.username + ".";
-      showSharedList();
+  accounts.forEach((account) => {
+    const button = makeButton("share-remove-button", "Stop sharing", () => {
+      button.disabled = true;
+      api(`/api/shares/${encodeURIComponent(account.id)}`, { method: "DELETE" })
+        .then(() => {
+          statusText.textContent = `Stopped sharing with ${account.username}.`;
+          const result = lastResults.find((match) => match.id === account.id);
+          if (result) {
+            result.sharing = false;
+            showResults(lastResults);
+          }
+          loadSharedList();
+        })
+        .catch((error) => {
+          button.disabled = false;
+          showError(error);
+        });
     });
 
-    sharedBox.appendChild(row);
+    sharedBox.appendChild(
+      accountCard(account, "Can see your location", "shared-account-row", button)
+    );
   });
+}
+
+function loadSharedList() {
+  api("/api/shares")
+    .then((data) => showSharedList(data.sharingWith))
+    .catch(showError);
 }
 
 searchInput.addEventListener("input", () => {
@@ -133,12 +161,14 @@ searchForm.addEventListener("submit", (event) => {
     return;
   }
 
-  const matches = searchAccounts(searchText);
-  showResults(matches);
-  statusText.textContent = matches.length
-    ? "Choose an account to share with."
-    : "No accounts found yet.";
+  api(`/api/users/search?q=${encodeURIComponent(searchText)}`)
+    .then((data) => {
+      showResults(data.users);
+      statusText.textContent = data.users.length
+        ? "Choose who can see your location."
+        : "No accounts found. Emails must match exactly.";
+    })
+    .catch(showError);
 });
 
-showSharedList();
-
+loadSharedList();

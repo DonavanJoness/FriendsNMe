@@ -1,4 +1,5 @@
 import math
+import statistics
 
 
 # ==================================================
@@ -21,6 +22,18 @@ WARNING_BUFFER = 25  # meters
 
 # Distance outside party radius for stronger alert.
 ALERT_BUFFER = 55  # meters
+
+# Largest the party geofence can grow to.
+MAX_PARTY_RADIUS = 150  # meters
+
+# Radius = RADIUS_SCALE x the median member distance from the
+# center. For people spread evenly over a circle, the median
+# distance is about 0.7 x the circle's radius, so 1.5 puts the
+# edge just outside the crowd.
+RADIUS_SCALE = 1.5
+
+# Most GPS error we give someone the benefit of the doubt for.
+MAX_ACCURACY_MARGIN = 25  # meters
 
 
 # ==================================================
@@ -249,6 +262,143 @@ def wandering_status(
     else:
 
         return "FAR_FROM_PARTY"
+
+
+# ==================================================
+# X/Y METERS -> GPS
+# ==================================================
+
+def xy_to_gps(
+    x,
+    y,
+    reference_lat,
+    reference_lon
+):
+
+    # Reverse of gps_to_xy.
+    latitude = reference_lat + y / 111320
+
+    longitude = reference_lon + x / (
+        111320
+        * math.cos(
+            math.radians(reference_lat)
+        )
+    )
+
+    return latitude, longitude
+
+
+# ==================================================
+# FIND SEPARATE GROUPS
+# ==================================================
+
+def find_clusters(
+    users,
+    cluster_distance=CLUSTER_DISTANCE,
+    min_users=MIN_PARTY_USERS
+):
+
+    # Unlike detect_party_cluster, this keeps separate groups
+    # apart. Two people are in the same group if a chain of
+    # people, each within cluster_distance of the next,
+    # connects them.
+
+    groups = []
+    unvisited = list(users)
+
+    while unvisited:
+
+        group = [unvisited.pop()]
+
+        index = 0
+
+        while index < len(group):
+
+            current = group[index]
+
+            nearby = [
+                other_user
+                for other_user in unvisited
+                if distance_from_party(
+                    current["x"],
+                    current["y"],
+                    other_user["x"],
+                    other_user["y"]
+                ) <= cluster_distance
+            ]
+
+            for other_user in nearby:
+                unvisited.remove(other_user)
+
+            group.extend(nearby)
+
+            index += 1
+
+        if len(group) >= min_users:
+            groups.append(group)
+
+    return groups
+
+
+# ==================================================
+# ROBUST CENTER AND RADIUS
+# ==================================================
+
+def robust_center(users):
+
+    # Median instead of average: one person standing far
+    # away barely moves the center.
+    center_x = statistics.median(
+        user["x"] for user in users
+    )
+
+    center_y = statistics.median(
+        user["y"] for user in users
+    )
+
+    return center_x, center_y
+
+
+def robust_radius(
+    users,
+    center_x,
+    center_y
+):
+
+    distances = [
+        distance_from_party(
+            user["x"],
+            user["y"],
+            center_x,
+            center_y
+        )
+        for user in users
+    ]
+
+    radius = (
+        RADIUS_SCALE
+        * statistics.median(distances)
+    )
+
+    return min(
+        max(radius, MIN_PARTY_RADIUS),
+        MAX_PARTY_RADIUS
+    )
+
+
+def confident_distance(
+    distance,
+    accuracy
+):
+
+    # Subtract the phone's GPS error so a jumpy reading
+    # does not set off a wandering alert.
+    margin = min(
+        float(accuracy or 0),
+        MAX_ACCURACY_MARGIN
+    )
+
+    return max(0.0, distance - margin)
 
 
 # ==================================================
