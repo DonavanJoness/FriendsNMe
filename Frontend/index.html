@@ -44,10 +44,9 @@
     <div class="nav-container">
       <nav>
         <ul class="nav-menu">
-          <li class="nav-item"><a href = "index.html">Home</a></li>
+          <li class="nav-item"><a href="index.html" aria-current="page">Home</a></li>
           <li class="nav-item"><a href="https://github.com/giowassheree/FriendsNMe">GitHub</a></li>
-          <li class="nav-item"><a href="sharing.html">Sharing</a>
-          </li>
+          <li class="nav-item"><a href="sharing.html">Sharing</a></li>
         </ul>
       </nav>
     </div>
@@ -57,20 +56,34 @@
     id="app"
     class="map-shell"
     aria-label="FriendsNMe map">
-    <div id="map" class="map_canvas"></div>
-    <div class="location-controls">
-      <button
-        id="locationButton"
-        class="primary-button"
-        type="button">
-        Use my location
-      </button>
-      <p
-        id="demo"
-        class="field-hint"
-        aria-live="polite">
-      </p>
+    <div class="map-column">
+      <div id="map" class="map_canvas"></div>
+      <div class="location-controls">
+        <button
+          id="locationButton"
+          class="primary-button"
+          type="button">
+          Use my location
+        </button>
+        <p
+          id="demo"
+          class="field-hint"
+          aria-live="polite">
+        </p>
+      </div>
     </div>
+
+    <aside class="sharing-panel friends-panel" aria-labelledby="friendsTitle">
+      <div class="sharing-heading">
+        <p class="eyebrow">Friends</p>
+        <h2 id="friendsTitle">Your friends</h2>
+        <p id="friendsCount" class="field-hint"></p>
+      </div>
+
+      <div id="friendsList" class="shared-accounts friends-list"></div>
+
+      <a class="ghost-button friends-manage" href="sharing.html">Manage friends</a>
+    </aside>
   </main>
 
   <div

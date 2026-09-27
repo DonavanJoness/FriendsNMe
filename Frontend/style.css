@@ -114,21 +114,113 @@ input {
 }
 
 .map-shell {
-  display: block;
-  width: 500px;
+  display: grid;
+  grid-template-columns: minmax(0, 500px) minmax(0, 300px);
+  align-items: start;
+  justify-content: center;
+  gap: 20px;
+  width: min(100% - 32px, 820px);
   min-height: 500px;
   margin: 20px auto;
   margin-top: 150px;
 }
 
+.friends-panel {
+  max-height: 420px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.friends-list {
+  overflow-y: auto;
+  align-content: start;
+}
+
+.friend-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.friend-info > div {
+  min-width: 0;
+}
+
+.friend-info strong,
+.friend-info span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-avatar {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--temple-cherry);
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.friends-manage {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .nav-menu {
-    list-style: none;
-    padding: 0;
-    list-style-type: none;
-    display: flex;
-    gap: 24px;
-    margin: 0;
-    padding-left: 20px;
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 10px;
+  background: rgb(0 0 0 / 22%);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.nav-item:has(a) {
+  padding: 0;
+}
+
+.nav-item a {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 7px;
+  color: #d9deea;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.nav-item a:hover {
+  background: rgb(255 255 255 / 8%);
+  color: #ffffff;
+}
+
+.nav-item a:focus-visible {
+  outline: 2px solid #f0bac3;
+  outline-offset: 2px;
+}
+
+.nav-item a[aria-current="page"] {
+  background: var(--temple-cherry);
+  color: #ffffff;
 }
 
 .map_canvas {
@@ -424,6 +516,20 @@ input {
   display: none;
 }
 
+@media (max-width: 860px) {
+  body {
+    overflow: auto;
+  }
+
+  .map-shell {
+    grid-template-columns: minmax(0, 500px);
+  }
+
+  .friends-panel {
+    max-height: none;
+  }
+}
+
 @media (max-width: 560px) {
   body {
     overflow: auto;
@@ -455,6 +561,12 @@ input {
 
   .ghost-button {
     padding: 0 10px;
+  }
+
+  .nav-item a {
+    min-height: 30px;
+    padding: 0 9px;
+    font-size: 0.82rem;
   }
 
   .map-shell {
