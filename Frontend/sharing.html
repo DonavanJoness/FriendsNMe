@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FriendsNMe Sharing</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script src="./sharing.js" defer></script>
+  </head>
+
+  <body class="sharing-page">
+    <header class="site-header">
+      <div>
+        <p class="eyebrow">Temple University</p>
+        <h1>FriendsNMe</h1>
+      </div>
+
+      <div class="nav-container">
+        <nav>
+          <ul class="nav-menu">
+            <li class="nav-item"><a href="index.html">Home</a></li>
+            <li class="nav-item"><a href="https://github.com/giowassheree/FriendsNMe">GitHub</a></li>
+            <li class="nav-item">About</li>
+            <li class="nav-item"><a href="sharing.html">Sharing</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main class="sharing-page-shell">
+      <section class="sharing-panel sharing-page-panel" aria-label="Location sharing">
+        <div class="sharing-heading">
+          <p class="eyebrow">Sharing</p>
+          <h2>Share your location</h2>
+          <p class="field-hint">Search for another student account and add them to your location share list.</p>
+        </div>
+
+        <form id="shareSearchForm" class="share-search-form">
+          <label for="shareSearch">Find an account</label>
+          <div class="share-search-row">
+            <input
+              id="shareSearch"
+              type="search"
+              autocomplete="off"
+              placeholder="Search username or Temple email"
+            />
+            <button id="shareSearchButton" class="primary-button compact-button" type="submit" disabled>Search</button>
+          </div>
+        </form>
+
+        <p id="shareStatus" class="field-hint" aria-live="polite">Search by username or Temple email.</p>
+
+        <div id="shareResults" class="share-results" aria-label="Search results"></div>
+
+        <div class="shared-list-heading">
+          <h3>Shared with</h3>
+        </div>
+        <div id="sharedAccounts" class="shared-accounts"></div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,415 @@
+﻿<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>FriendsNME</title>
+
+  <link rel="stylesheet" href="./style.css" />
+  <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
+  <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="./index.js" defer></script>
+</head>
+
+
+<body class="auth-locked">
+
+  <!-- ==================================================
+       HEADER
+       ================================================== -->
+
+  <header class="site-header">
+
+    <div>
+      <p class="eyebrow">Temple University</p>
+      <h1>FriendsNMe</h1>
+    </div>
+
+    <div class="session-controls">
+
+      <span
+        id="userBadge"
+        class="user-badge"
+        hidden>
+      </span>
+
+      <button
+        id="logoutButton"
+        class="ghost-button"
+        type="button"
+        hidden>
+        Sign out
+      </button>
+
+    </div>
+
+
+    <div class="nav-container">
+
+      <nav>
+
+        <ul class="nav-menu">
+
+          <li class="nav-item">
+            Home
+          </li>
+
+          <li class="nav-item">
+            <a href="https://github.com/giowassheree/FriendsNMe">
+              GitHub
+            </a>
+          </li>
+
+          <li class="nav-item">
+            <a href="sharing.html">
+              Sharing
+            </a>
+          </li>
+
+        </ul>
+
+      </nav>
+
+    </div>
+
+  </header>
+
+  <!-- ==================================================
+       MAP
+       ================================================== -->
+
+  <main
+    id="app"
+    class="map-shell"
+    aria-label="FriendsNMe map">
+
+    <div id="map" class="map_canvas"></div>
+
+
+    <!-- LOCATION BUTTON -->
+
+    <div class="location-controls">
+
+      <button
+        id="locationButton"
+        class="primary-button"
+        type="button">
+        Use my location
+      </button>
+
+      <p
+        id="demo"
+        class="field-hint"
+        aria-live="polite">
+      </p>
+
+    </div>
+
+  </main>
+
+
+  <!-- ==================================================
+       AUTHENTICATION
+       ================================================== -->
+
+  <div
+    id="authOverlay"
+    class="auth-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="authTitle">
+
+    <section class="auth-modal">
+
+      <div class="modal-heading">
+
+        <p class="eyebrow">
+          Secure access
+        </p>
+
+        <h2 id="authTitle">
+          Temple sign in
+        </h2>
+
+        <p id="authSubtitle">
+          Use your Temple University email to access FriendsNMe.
+        </p>
+
+      </div>
+
+
+      <div
+        id="authMessage"
+        class="auth-message"
+        hidden>
+      </div>
+
+
+      <!-- EMAIL FORM -->
+
+      <form
+        id="emailForm"
+        class="auth-form"
+        novalidate>
+
+        <label for="templeEmail">
+          Temple email
+        </label>
+
+        <input
+          id="templeEmail"
+          type="email"
+          inputmode="email"
+          autocomplete="email"
+          placeholder="you@temple.edu"
+          required
+        />
+
+        <p
+          id="emailHint"
+          class="field-hint">
+
+          Enter your @temple.edu email address.
+
+        </p>
+
+        <button
+          id="emailSubmit"
+          class="primary-button"
+          type="submit"
+          disabled>
+
+          Send verification code
+
+        </button>
+
+      </form>
+
+
+      <!-- VERIFICATION CODE -->
+
+      <form
+        id="codeForm"
+        class="auth-form"
+        novalidate
+        hidden>
+
+        <label for="verificationCode">
+          Verification code
+        </label>
+
+        <input
+          id="verificationCode"
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          maxlength="6"
+          placeholder="000000"
+          required
+        />
+
+        <button
+          id="codeSubmit"
+          class="primary-button"
+          type="submit"
+          disabled>
+
+          Verify code
+
+        </button>
+
+
+        <div class="inline-actions">
+
+          <button
+            id="resendCode"
+            class="link-button"
+            type="button">
+
+            Resend code
+
+          </button>
+
+
+          <button
+            id="changeEmail"
+            class="link-button"
+            type="button">
+
+            Change email
+
+          </button>
+
+        </div>
+
+      </form>
+
+
+      <!-- USERNAME -->
+
+      <form
+        id="usernameForm"
+        class="auth-form"
+        novalidate
+        hidden>
+
+        <p class="verified-line">
+
+          Verified
+
+          <strong id="verifiedEmail"></strong>
+
+        </p>
+
+
+        <label for="username">
+          Username
+        </label>
+
+
+        <input
+          id="username"
+          type="text"
+          autocomplete="username"
+          maxlength="32"
+          placeholder="Choose a username"
+          required
+        />
+
+
+        <p class="field-hint">
+
+          Usernames are unique and checked against registered accounts.
+
+        </p>
+
+
+        <button
+          id="usernameSubmit"
+          class="primary-button"
+          type="submit"
+          disabled>
+
+          Create account
+
+        </button>
+
+      </form>
+
+    </section>
+
+  </div>
+
+
+  <script>
+    // OpenFreeMap (MapLibre GL) - MapLibre uses [lng, lat] order
+    const map = new maplibregl.Map({
+      container: "map",
+      style: "https://tiles.openfreemap.org/styles/dark",
+      center: [-75.16, 39.98],
+      zoom: 14
+    });
+    map.addControl(new maplibregl.NavigationControl());
+
+    // Make all labels (street names, places, etc.) white
+    map.on("load", () => {
+      for (const layer of map.getStyle().layers) {
+        if (layer.type === "symbol" && layer.layout && layer.layout["text-field"]) {
+          map.setPaintProperty(layer.id, "text-color", "#ffffff");
+          map.setPaintProperty(layer.id, "text-halo-color", "rgba(0, 0, 0, 0.85)");
+        }
+      }
+    });
+
+    const userMarker = new maplibregl.Marker();
+    let userMarkerAdded = false;
+
+    const x = document.getElementById("demo");
+    const locationButton = document.getElementById("locationButton");
+    let watchId = null;
+
+    function getLocation() {
+      // If we're already tracking, pressing the button stops tracking.
+      if (watchId !== null) {
+        stopTracking();
+        return;
+      }
+
+      if (navigator.geolocation) {
+        x.textContent = "Requesting location...";
+        watchId = navigator.geolocation.watchPosition(success, error, {
+          enableHighAccuracy: true,
+          maximumAge: 5000,
+          // If the phone cannot get GPS within 10 seconds, call error().
+          timeout: 10000
+        });
+        locationButton.textContent = "Stop tracking";
+      } else {
+        x.textContent = "Geolocation is not supported by this browser.";
+      }
+    }
+
+    function stopTracking() {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      watchId = null;
+      locationButton.textContent = "Use my location";
+      x.textContent = "Location tracking stopped.";
+    }
+
+    function success(position) {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      x.textContent =
+        "Latitude: " + lat.toFixed(5) +
+        ", Longitude: " + lng.toFixed(5);
+
+      // Move the map to the user's location
+      userMarker.setLngLat([lng, lat]);
+      if (!userMarkerAdded) {
+        userMarker.addTo(map);
+        userMarkerAdded = true;
+      }
+      map.easeTo({ center: [lng, lat], zoom: 16 });
+
+      // Send the location to Flask
+      fetch("/location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ latitude: lat, longitude: lng })
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error("Flask returned HTTP " + response.status);
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.log("Response from calculations.py:", data);
+        })
+        .catch(fetchError => {
+          console.error("Error sending location to Flask:", fetchError);
+        });
+    }
+
+    function error(err) {
+      x.textContent = "Location error " + err.code + ": " + err.message;
+      console.error("Geolocation error:", err);
+
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      watchId = null;
+      locationButton.textContent = "Use my location";
+    }
+
+    locationButton.addEventListener("click", getLocation);
+  </script>
+
+</body>
+
+</html>
