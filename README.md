@@ -92,8 +92,15 @@ How parties work (`server/data/party.py`):
   2 minutes don't count.
 - Overlapping parties merge. A party ends after 15 minutes without 2 members
   together. Parties live in memory, so restarting the server clears them.
+- "Leave party" stops you being counted or re-added automatically. The party
+  stays on your map in gray, and "Rejoin party" puts you back in as long as
+  it's still going.
 - Statuses: `INSIDE_PARTY`, `BUFFER_ZONE` (within 25 m of the edge),
   `WANDERING` (within 55 m), `FAR_FROM_PARTY`.
+- Testing mode: while `SMALL_RADIUS_TESTING = True` in
+  `server/data/calculations.py`, distances are roughly halved (15 m minimum
+  radius, 20 m to form a party, buffer +10 m, wandering +25 m, GPS error
+  forgiven up to 10 m). Set it to `False` for real use.
 
 Location sharing is one-way: adding someone on the Sharing page lets them see
 you on their map. They only appear on yours if they add you back.

@@ -117,6 +117,18 @@ class PartyTracker:
                 return party
         return None
 
+    def left_party_for(self, user_id):
+        """A party this user left and can rejoin, if they are
+        not in another party now."""
+
+        if self.party_for(user_id):
+            return None
+
+        for party in self.parties.values():
+            if user_id in party.left_ids:
+                return party
+        return None
+
     def status_for(self, user_id, location):
         """Where a user stands relative to their party."""
 
@@ -124,10 +136,16 @@ class PartyTracker:
             party = self.party_for(user_id)
 
             if not party or not location:
+                left_party = self.left_party_for(user_id)
                 return {
                     "party": None,
                     "status": "NOT_IN_PARTY",
                     "distanceFromParty": None,
+                    "leftParty": (
+                        left_party.to_public_dict()
+                        if left_party
+                        else None
+                    ),
                 }
 
             distance = party.distance_to(location)
@@ -142,6 +160,7 @@ class PartyTracker:
                     party.radius
                 ),
                 "distanceFromParty": round(distance, 2),
+                "leftParty": None,
             }
 
     # ----------------------------------------------
@@ -154,6 +173,19 @@ class PartyTracker:
             if party:
                 party.member_ids.discard(user_id)
                 party.left_ids.add(user_id)
+
+    def rejoin(self, user_id):
+        """Undo leave(). Returns False if there is nothing to
+        rejoin (the party ended or they joined another)."""
+
+        with self.lock:
+            party = self.left_party_for(user_id)
+            if not party:
+                return False
+
+            party.left_ids.discard(user_id)
+            party.member_ids.add(user_id)
+            return True
 
     def expire(self, now):
         with self.lock:
