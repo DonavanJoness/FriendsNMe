@@ -37,7 +37,8 @@ class User(db.Model):
             "id": self.id,
             "email": self.email,
             "username": self.username,
-            "createdAt": self.created_at.isoformat(),
+            # SQLite returns naive datetimes; they are stored as UTC
+            "createdAt": self.created_at.replace(tzinfo=timezone.utc).isoformat(),
         }
 
 
