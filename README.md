@@ -56,20 +56,21 @@ python server/data/app.py
 - `FRIENDSNME_ENV=production` or `FLASK_ENV=production`: enables production config outside Railway. Railway is detected automatically through `RAILWAY_ENVIRONMENT`.
 - `FRIENDSNME_DEBUG=true`: enables Flask debug mode, debug user logs, and `/api/debug/users`. Do not use this on a public or shared network.
 - `AUTH_LOG_VERIFICATION_CODES=true`: prints verification codes in development only. It is ignored in production.
-- `FRIENDSNME_REQUIRE_EMAIL_DELIVERY=true`: in development, require SMTP email delivery instead of falling back to terminal verification codes.
-- `SMTP_HOST`, `SMTP_FROM`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`: required in production for real email delivery.
+- `RESEND_API_KEY`: Resend API key used to send verification emails.
+- `EMAIL_FROM`: verified sender address used for verification emails.
 
 Production requires:
 
 ```text
 SESSION_SECRET
 DATABASE_URL
-SMTP_HOST
-SMTP_PORT
-SMTP_FROM
-SMTP_USER
-SMTP_PASS
-SMTP_SECURE
+```
+
+Verification email delivery requires:
+
+```text
+RESEND_API_KEY
+EMAIL_FROM
 ```
 
 Keep these off in production:
@@ -84,27 +85,19 @@ AUTH_LOG_VERIFICATION_CODES
 For local testing with real email delivery:
 
 1. Copy `.env.example` to `.env`.
-2. Fill in real SMTP settings from your email provider.
-3. Set `FRIENDSNME_REQUIRE_EMAIL_DELIVERY=true`.
-4. Make sure `AUTH_LOG_VERIFICATION_CODES` is not set.
-5. Restart Flask.
+2. Fill in `RESEND_API_KEY` and `EMAIL_FROM`.
+3. Make sure `AUTH_LOG_VERIFICATION_CODES` is not set.
+4. Restart Flask.
 
 Example `.env` values:
 
 ```text
 SESSION_SECRET=<your local secret>
-FRIENDSNME_REQUIRE_EMAIL_DELIVERY=true
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_FROM=FriendsNMe <no-reply@example.com>
-SMTP_USER=<smtp username>
-SMTP_PASS=<smtp password>
-SMTP_SECURE=false
+RESEND_API_KEY=<your Resend API key>
+EMAIL_FROM=FriendsNMe <no-reply@example.com>
 ```
 
-Use `SMTP_SECURE=false` for SMTP with STARTTLS on port `587`. Use `SMTP_SECURE=true` for SMTP-over-SSL on port `465`.
-
-Production always requires SMTP and never prints verification codes to the console.
+Production never prints verification codes to the console. If Resend is missing or misconfigured, the app still boots and `/api/health` still works, but `/api/auth/request-code` returns `503`.
 
 ## Database Migrations
 
@@ -159,12 +152,8 @@ FriendsNMe deploys as one Flask app that serves both the frontend and API from t
 
 ```text
 SESSION_SECRET=<generate a long random value>
-SMTP_HOST=<your SMTP host>
-SMTP_PORT=587
-SMTP_FROM=<verified sender address>
-SMTP_USER=<SMTP username>
-SMTP_PASS=<SMTP password>
-SMTP_SECURE=false
+RESEND_API_KEY=<your Resend API key>
+EMAIL_FROM=FriendsNMe <verified-sender@example.com>
 ```
 
 6. Make sure these are not set in production:

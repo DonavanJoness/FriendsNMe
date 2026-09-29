@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+from types import SimpleNamespace
 
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -18,12 +19,8 @@ def run_import_with_env(extra_env):
             "FLASK_ENV",
             "FRIENDSNME_ENV",
             "RAILWAY_ENVIRONMENT",
-            "SMTP_HOST",
-            "SMTP_PORT",
-            "SMTP_FROM",
-            "SMTP_USER",
-            "SMTP_PASS",
-            "SMTP_SECURE",
+            "RESEND_API_KEY",
+            "EMAIL_FROM",
             "AUTH_LOG_VERIFICATION_CODES",
             "FRIENDSNME_DEBUG",
         }
@@ -86,12 +83,6 @@ def test_production_enables_secure_session_cookie():
         "FLASK_ENV": "production",
         "SESSION_SECRET": "test-secret",
         "DATABASE_URL": "postgresql://user:pass@example.com:5432/friendsnme",
-        "SMTP_HOST": "smtp.example.com",
-        "SMTP_PORT": "587",
-        "SMTP_FROM": "friendsnme@example.com",
-        "SMTP_USER": "smtp-user",
-        "SMTP_PASS": "smtp-pass",
-        "SMTP_SECURE": "false",
     })
 
     assert result.returncode == 0
@@ -123,18 +114,93 @@ def test_auth_session_requires_login():
     assert response.status_code == 401
 
 
-def test_require_email_delivery_rejects_missing_smtp(monkeypatch):
+def test_verification_request_rejects_missing_resend_config(monkeypatch):
     from test_parties import app
 
-    monkeypatch.setenv("FRIENDSNME_REQUIRE_EMAIL_DELIVERY", "true")
-    monkeypatch.delenv("SMTP_HOST", raising=False)
-    monkeypatch.delenv("SMTP_FROM", raising=False)
+    monkeypatch.delenv("AUTH_LOG_VERIFICATION_CODES", raising=False)
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.delenv("EMAIL_FROM", raising=False)
 
     client = app.test_client()
     response = client.post(
         "/api/auth/request-code",
-        json={"email": "emaildeliverytest@temple.edu"},
+        json={"email": "missingresend@temple.edu"},
     )
 
     assert response.status_code == 503
-    assert "Email delivery is not configured" in response.get_json()["error"]
+    assert response.get_json()["error"] == (
+        "Verification email delivery is not configured."
+    )
+
+
+def test_verification_email_sends_with_resend(monkeypatch):
+    from test_parties import app
+
+    sent = {}
+
+    class FakeEmails:
+        @staticmethod
+        def send(params):
+            sent["params"] = params
+            return {"id": "email_123"}
+
+    fake_resend = SimpleNamespace(
+        api_key=None,
+        Emails=FakeEmails,
+    )
+
+    monkeypatch.setitem(sys.modules, "resend", fake_resend)
+    monkeypatch.delenv("AUTH_LOG_VERIFICATION_CODES", raising=False)
+    monkeypatch.setenv("RESEND_API_KEY", "re_test_key")
+    monkeypatch.setenv("EMAIL_FROM", "FriendsNMe <no-reply@example.com>")
+
+    client = app.test_client()
+    response = client.post(
+        "/api/auth/request-code",
+        json={"email": "resendsuccess@temple.edu"},
+    )
+
+    assert response.status_code == 200
+    assert fake_resend.api_key == "re_test_key"
+    assert sent["params"]["from"] == "FriendsNMe <no-reply@example.com>"
+    assert sent["params"]["to"] == ["resendsuccess@temple.edu"]
+    assert sent["params"]["subject"] == "FriendsNMe verification code"
+    assert "FriendsNMe" in sent["params"]["text"]
+    assert "Your Temple verification code is:" in sent["params"]["text"]
+    assert "This code expires in 10 minutes." in sent["params"]["text"]
+
+
+def test_invalid_temple_email_is_rejected_before_email_send(monkeypatch):
+    from test_parties import app
+
+    monkeypatch.delenv("AUTH_LOG_VERIFICATION_CODES", raising=False)
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.delenv("EMAIL_FROM", raising=False)
+
+    client = app.test_client()
+    response = client.post(
+        "/api/auth/request-code",
+        json={"email": "student@example.com"},
+    )
+
+    assert response.status_code == 400
+    assert "Temple University" in response.get_json()["error"]
+
+
+def test_local_logging_mode_prints_code(monkeypatch, capsys):
+    from test_parties import app
+
+    monkeypatch.setenv("AUTH_LOG_VERIFICATION_CODES", "true")
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    monkeypatch.delenv("EMAIL_FROM", raising=False)
+
+    client = app.test_client()
+    response = client.post(
+        "/api/auth/request-code",
+        json={"email": "localprint@temple.edu"},
+    )
+
+    captured = capsys.readouterr()
+
+    assert response.status_code == 200
+    assert "[AUTH] Verification code for localprint@temple.edu:" in captured.out

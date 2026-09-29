@@ -5,11 +5,9 @@ import os
 import random
 import re
 import secrets
-import smtplib
 import time
 
 from datetime import timedelta, timezone, datetime
-from email.message import EmailMessage
 
 from flask import Flask, request, jsonify, send_from_directory, session
 from flask_migrate import Migrate
@@ -124,12 +122,6 @@ app.secret_key = os.environ.get("SESSION_SECRET")
 PRODUCTION_REQUIRED_ENV = [
     "SESSION_SECRET",
     "DATABASE_URL",
-    "SMTP_HOST",
-    "SMTP_PORT",
-    "SMTP_FROM",
-    "SMTP_USER",
-    "SMTP_PASS",
-    "SMTP_SECURE",
 ]
 
 if PRODUCTION_MODE:
@@ -573,28 +565,30 @@ def require_party_host(party_id):
 # EMAIL VERIFICATION
 # ==================================================
 
-def send_verification_email(email, code):
+def should_log_verification_codes():
 
-    require_email_delivery = (
-        PRODUCTION_MODE
-        or env_flag("FRIENDSNME_REQUIRE_EMAIL_DELIVERY")
-    )
-
-    should_log = (
+    return (
         env_flag("AUTH_LOG_VERIFICATION_CODES")
         and not PRODUCTION_MODE
-        and not require_email_delivery
     )
 
-    # During development, print verification code
-    # directly into terminal if SMTP is not configured.
-    if (
-        should_log
+
+def verification_email_delivery_configured():
+
+    return (
+        should_log_verification_codes()
         or (
-            not require_email_delivery
-            and not os.environ.get("SMTP_HOST")
+            bool(os.environ.get("RESEND_API_KEY"))
+            and bool(os.environ.get("EMAIL_FROM"))
         )
-    ):
+    )
+
+
+def send_verification_email(email, code):
+
+    # During development, print verification code directly into
+    # terminal when explicitly enabled. Production never does this.
+    if should_log_verification_codes():
 
         print(
             f"[AUTH] Verification code for {email}: {code}",
@@ -603,72 +597,59 @@ def send_verification_email(email, code):
 
         return
 
-    smtp_host = os.environ.get("SMTP_HOST")
-    smtp_from = os.environ.get("SMTP_FROM")
+    resend_api_key = os.environ.get("RESEND_API_KEY")
+    email_from = os.environ.get("EMAIL_FROM")
 
-    if not smtp_host or not smtp_from:
+    if not resend_api_key or not email_from:
 
+        print(
+            "EMAIL CONFIG ERROR: Verification email delivery is not "
+            "configured. Set RESEND_API_KEY and EMAIL_FROM.",
+            flush=True
+        )
         raise RuntimeError(
-            "Email delivery is not configured. Set SMTP_HOST and SMTP_FROM."
+            "Verification email delivery is not configured."
         )
 
-    smtp_port = int(
-        os.environ.get(
-            "SMTP_PORT",
-            "587"
+    try:
+        import resend
+    except ImportError as error:
+        print(
+            "EMAIL CONFIG ERROR: The resend package is not installed.",
+            flush=True
         )
+        raise RuntimeError(
+            "Verification email delivery is not configured."
+        ) from error
+
+    resend.api_key = resend_api_key
+
+    message_text = (
+        "FriendsNMe\n\n"
+        "Your Temple verification code is:\n\n"
+        f"{code}\n\n"
+        "This code expires in 10 minutes.\n\n"
+        "If you did not request this code, you can ignore this email."
     )
 
-    smtp_user = os.environ.get("SMTP_USER")
-    smtp_pass = os.environ.get("SMTP_PASS")
+    params = {
+        "from": email_from,
+        "to": [email],
+        "subject": "FriendsNMe verification code",
+        "text": message_text,
+    }
 
-    smtp_secure = (
-        os.environ.get(
-            "SMTP_SECURE",
-            ""
-        ).lower() == "true"
-    )
-
-    message = EmailMessage()
-
-    message["From"] = smtp_from
-    message["To"] = email
-    message["Subject"] = "Your FriendsNMe verification code"
-
-    message.set_content(
-        f"Your FriendsNMe verification code is {code}. "
-        "It expires in 10 minutes."
-    )
-
-    if smtp_secure:
-
-        server = smtplib.SMTP_SSL(
-            smtp_host,
-            smtp_port,
-            timeout=20
+    try:
+        resend.Emails.send(params)
+    except Exception as error:
+        print(
+            "EMAIL DELIVERY ERROR: Resend could not send a "
+            "verification email.",
+            flush=True
         )
-
-    else:
-
-        server = smtplib.SMTP(
-            smtp_host,
-            smtp_port,
-            timeout=20
-        )
-
-    with server:
-
-        if not smtp_secure:
-            server.starttls()
-
-        if smtp_user and smtp_pass:
-
-            server.login(
-                smtp_user,
-                smtp_pass
-            )
-
-        server.send_message(message)
+        raise RuntimeError(
+            "Verification email delivery failed. Try again later."
+        ) from error
 
 
 def latest_usable_code(email):
@@ -774,6 +755,13 @@ def request_code():
         return json_error(
             "Only Temple University email addresses can access this website.",
             400
+        )
+
+    if not verification_email_delivery_configured():
+
+        return json_error(
+            "Verification email delivery is not configured.",
+            503
         )
 
     current = now_utc()
