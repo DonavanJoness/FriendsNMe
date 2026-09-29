@@ -1,22 +1,24 @@
 # FriendsNMe
-The purpose of friendNMe is to help temple studets keep track of there friends during parties off campus
-using a website friendsNMe gathers the location from devices and allows user to create partys with other users
-and if one of the party members being to move away from the party the other members will recive an alert
-Roles 
-Main algorithm- this will be where calculations will be done for a user's gps location given from the website 
-              - accounts and a buddy system (someone spli
 
-alerts- once we receive the information from the calculations the alerts will connect back to an event that the website will go through 
+FriendsNMe is a Temple University student project that helps groups of friends stay together during parties and nights out. Students sign in with a Temple `@temple.edu` email, create a private temporary Party Group, invite friends with a short code, and share live location only with that party.
 
-UI- how the map will be set up basically front end (can be 2 or 3 people that works on this) 
-  
-- Duwayne: calculations/ alerts 
-- Donavan: UI Design
-- Gio: UI, Mapping
-- Nymere: Accounts and Buddy System (Split)
-- Austin: Calculations/alerts 
+FriendsNMe is an independent student project and is not affiliated with or endorsed by Temple University or TU Parties.
 
-Flask local server:
+## Phase 1 Party Workflow
+
+1. A signed-in user creates a party and gives it a name.
+2. FriendsNMe creates a short join code like `OWL-4827`.
+3. The creator becomes the host and can invite friends with `/join?code=...`.
+4. Other signed-in Temple users confirm the join code before joining.
+5. Each member explicitly chooses whether to share live location with that party.
+6. Party geofence and wandering status are calculated only from active members of that exact Party Group.
+7. Members can pause sharing, set check-in status, leave, or rejoin while allowed.
+8. The host can remove members or end the party.
+9. Parties expire after about 12 hours by default, which stops party location sharing.
+
+Permanent friend sharing still exists on the Sharing page. Joining a party does not add anyone to a normal sharing list.
+
+## Run Locally
 
 ```bash
 python3 -m venv .venv
@@ -24,6 +26,14 @@ source .venv/bin/activate
 pip install -r requirements.txt
 AUTH_LOG_VERIFICATION_CODES=true FRIENDSNME_DEBUG=true python server/data/app.py
 ```
+
+Open:
+
+```text
+http://localhost:5000/
+```
+
+When testing locally, verification codes print in the Flask terminal.
 
 Windows PowerShell:
 
@@ -34,82 +44,92 @@ $env:FRIENDSNME_DEBUG="true"
 python server/data/app.py
 ```
 
-Then open:
-http://localhost:5000/
+## Environment Variables
 
-When testing locally, verification codes print in the Flask terminal.
+- `SESSION_SECRET`: signs login cookies. Set this for any shared testing. If unset, the server creates a random secret and everyone is signed out on restart.
+- `FRIENDSNME_DATABASE_URI`: optional SQLAlchemy database URI. Defaults to `server/data/friendsnme.db`.
+- `FRIENDSNME_DEBUG=true`: enables Flask debug mode, debug user logs, and `/api/debug/users`. Do not use this on a public or shared network.
+- `AUTH_LOG_VERIFICATION_CODES=true`: prints verification codes in the terminal instead of emailing them.
+- `SMTP_HOST`, `SMTP_FROM`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`: optional SMTP settings for real email delivery.
 
-Environment variables:
+## Testing With Multiple Phones
 
-- `SESSION_SECRET`: signs login cookies. If it is not set, the server picks a
-  random one and everyone is signed out on restart. Generate one with
-  `python -c "import secrets; print(secrets.token_hex(32))"` and never commit it.
-- `FRIENDSNME_DEBUG=true`: turns on the Flask debugger, the
-  `/api/debug/users` endpoint and user details in the startup log. Only use it
-  on your own machine, never when others on the network can reach the server.
-- `AUTH_LOG_VERIFICATION_CODES=true`: prints verification codes in the
-  terminal instead of emailing them.
-
-Flask local network server:
-
-Use this when people on the same Wi-Fi/network need to open the website from
-their own devices. Leave `FRIENDSNME_DEBUG` off here.
+Phone browsers require HTTPS for location access unless the site is on `localhost`. For same-network phone testing, run Flask on the laptop and expose it through a temporary HTTPS tunnel:
 
 ```bash
 source .venv/bin/activate
 AUTH_LOG_VERIFICATION_CODES=true SESSION_SECRET=<your generated secret> python server/data/app.py
-```
-
-Then share this link with people on the same network (use your computer's IP):
-http://10.109.29.222:5000/
-
-Testing on phones (https):
-
-Phone browsers only allow location on `https://` pages, so the plain
-`http://` network link above can't track location. The easiest fix is a free
-Cloudflare tunnel, which gives the laptop's server a temporary https link:
-
-```bash
-# install once: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
 cloudflared tunnel --url http://localhost:5000
 ```
 
-Open the `https://....trycloudflare.com` link it prints on each phone.
+Open the `https://...trycloudflare.com` URL on each phone. Create separate accounts, create a party on one phone, join with the code on the others, then tap `Use my location`.
 
-How parties work (`server/data/party.py`):
+## Tests
 
-- Parties are formed by users adding there accounts through team form up feature
-  on the website 
-- The circle is the median position of the members inside it, with radius
-  1.5 x their median distance from the center (30 to 150 m). Medians mean one
-  person walking away can't drag the circle with them.
-- Each phone's GPS accuracy (up to 25 m) is subtracted before calling it
-  wandering; readings worse than 100 m are ignored. Locations older than
-  2 minutes don't count.
-- "Leave party" stops you being counted or re-added automatically. The party
-  stays on your map in gray, and "Rejoin party" puts you back in as long as
-  it's still going.
-- Statuses: `INSIDE_PARTY`, `BUFFER_ZONE` (within 25 m of the edge),
-  `WANDERING` (within 55 m), `FAR_FROM_PARTY`.
-- Testing mode: while `SMALL_RADIUS_TESTING = True` in
-  `server/data/calculations.py`, distances are roughly halved (15 m minimum
-  radius, 20 m to form a party, buffer +10 m, wandering +25 m, GPS error
-  forgiven up to 10 m). Set it to `False` for real use.
+```bash
+source .venv/bin/activate
+pytest
+```
 
-Wandering alerts (`Frontend/alerts.js`):
+The tests use an isolated SQLite database path configured through `FRIENDSNME_DATABASE_URI`.
 
-- When you or a friend in your party moves to `WANDERING` or `FAR_FROM_PARTY`,
-  the page shows a banner, vibrates (Android) and sends a phone notification
-  if you tapped "Turn on phone notifications". You also get one when they are
-  back. Repeats for the same person are held back for 2 minutes.
-- These only work while the page is open. Phones pause web pages when the
-  screen is off or the browser is in the background; alerts in that case
-  would need Web Push from the server.
-- Notifications need https (or localhost), like location. On iPhone they only
-  work if the site is added to the home screen.
+## Party API
 
-Location sharing is one-way: adding someone on the Sharing page lets them see
-you on their map. They only appear on yours if they add you back.
+- `POST /api/parties`
+- `POST /api/parties/join`
+- `GET /api/parties/current`
+- `GET /api/parties/<party_id>`
+- `GET /api/parties/<party_id>/locations`
+- `POST /api/parties/<party_id>/leave`
+- `POST /api/parties/<party_id>/rejoin`
+- `POST /api/parties/<party_id>/end`
+- `DELETE /api/parties/<party_id>/members/<user_id>`
+- `POST /api/parties/<party_id>/location-sharing`
+- `POST /api/parties/<party_id>/status`
 
-Local data (`*.db`, `auth-db.json`) and `.venv` are in `.gitignore`. Do not
-commit them: the database holds users' emails and locations.
+Authorization is server-side. The frontend never proves identity by sending a viewer ID.
+
+## Database Changes
+
+New tables:
+
+- `parties`: party name, unique join code, host, status, expiration, end time, and optional destination fields.
+- `party_members`: one row per party/user pair, role, joined/left/removed timestamps, temporary location sharing flag, and latest check-in status.
+
+Existing user location storage remains "latest location only" on the `users` table.
+
+## TU Parties Behavior
+
+FriendsNMe does not scrape TU Parties, bypass authentication, copy private addresses, collect cookies, or claim affiliation. The Create Party modal includes a `Find on TU Parties` link that opens `https://www.tuparties.com/` in a new tab. Users can then manually enter an event name, address, start time, optional URL, and mark the source as TU Parties.
+
+The backend normalizes manual and TU Parties-sourced destination data through `server/data/event_sources.py`, so an approved API can later replace the manual step without changing the rest of the app.
+
+## Privacy Assumptions
+
+- Party locations are returned only to active members of the same active party.
+- A member must have party location sharing enabled.
+- Stale party locations are not returned as live coordinates.
+- Leaving, being removed, party expiration, or host ending immediately disables party sharing.
+- Public search and profile responses do not include coordinates.
+- Exact coordinates are only printed in debug mode.
+- FriendsNMe is not an emergency service. Call 911 in an emergency.
+
+## Geofence Settings
+
+Production-style settings live in `server/data/calculations.py`:
+
+- `MIN_PARTY_USERS`
+- `CLUSTER_DISTANCE`
+- `MIN_PARTY_RADIUS`
+- `WARNING_BUFFER`
+- `ALERT_BUFFER`
+- `MAX_PARTY_RADIUS`
+- `MAX_ACCURACY_MARGIN`
+
+Production values are the default. For short-distance two-phone testing, start Flask with:
+
+```bash
+FRIENDSNME_SMALL_RADIUS_TESTING=true AUTH_LOG_VERIFICATION_CODES=true python server/data/app.py
+```
+
+Do not set `FRIENDSNME_SMALL_RADIUS_TESTING=true` for real-world use.

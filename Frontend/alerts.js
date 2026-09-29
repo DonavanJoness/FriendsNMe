@@ -44,9 +44,9 @@ function checkForAlerts(data) {
     people.push({ id: "me", status: data.me.status, distance: data.me.distanceFromParty });
   }
 
-  // Only friends in my party with a fresh location.
-  data.friends.forEach((friend) => {
-    if (friend.sameParty && friend.location && friend.ageSeconds <= data.freshSeconds) {
+  // Only explicit party members with a fresh shared location.
+  (data.party?.members || []).forEach((friend) => {
+    if (!friend.isSelf && friend.location && friend.ageSeconds <= data.freshSeconds) {
       people.push({
         id: friend.id,
         name: friend.username,

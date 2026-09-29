@@ -120,18 +120,202 @@
       </div>
     </div>
 
-    <aside class="sharing-panel friends-panel" aria-labelledby="friendsTitle">
-      <div class="sharing-heading">
-        <p class="eyebrow">Friends</p>
-        <h2 id="friendsTitle">Your friends</h2>
-        <p id="friendsCount" class="field-hint"></p>
-      </div>
+    <aside class="side-column">
+      <section class="sharing-panel party-panel" aria-labelledby="partyPanelTitle">
+        <div class="sharing-heading">
+          <p class="eyebrow">Party Group</p>
+          <h2 id="partyPanelTitle">Start a party</h2>
+          <p id="partyPanelDetail" class="field-hint">
+            Create or join a private temporary group before the night starts.
+          </p>
+        </div>
 
-      <div id="friendsList" class="shared-accounts friends-list"></div>
+        <div id="noPartyActions" class="party-actions">
+          <button id="createPartyOpen" class="primary-button" type="button">
+            Create Party
+          </button>
+          <button id="joinPartyOpen" class="ghost-button" type="button">
+            Join Party
+          </button>
+        </div>
 
-      <a class="ghost-button friends-manage" href="sharing.html">Manage sharing</a>
+        <div id="activePartyContent" class="active-party" hidden>
+          <div class="party-code-row">
+            <span id="partyCodeText"></span>
+            <button id="copyPartyCode" class="share-add-button" type="button">
+              Copy
+            </button>
+          </div>
+
+          <dl class="party-facts">
+            <div>
+              <dt>Host</dt>
+              <dd id="partyHostText"></dd>
+            </div>
+            <div>
+              <dt>Members</dt>
+              <dd id="partyMemberCount"></dd>
+            </div>
+            <div>
+              <dt>Time left</dt>
+              <dd id="partyTimeLeft"></dd>
+            </div>
+          </dl>
+
+          <div id="partyDestination" class="party-destination" hidden>
+            <p class="eyebrow">Destination</p>
+            <strong id="partyDestinationName"></strong>
+            <span id="partyDestinationDetail"></span>
+            <span id="partyDestinationDistance"></span>
+            <button id="partyDirections" class="ghost-button" type="button">
+              Directions
+            </button>
+          </div>
+
+          <div class="sharing-state">
+            <strong id="partySharingState"></strong>
+            <button id="togglePartySharing" class="share-remove-button" type="button">
+              Stop Sharing Location
+            </button>
+          </div>
+
+          <label class="checkin-control" for="partyCheckIn">
+            Check-in
+            <select id="partyCheckIn">
+              <option value="IM_GOOD">I'm Good</option>
+              <option value="HEADING_HOME">Heading Home</option>
+              <option value="NEED_HELP">Need Help</option>
+            </select>
+          </label>
+
+          <div id="partyMembersList" class="party-members-list"></div>
+
+          <p class="safety-note">
+            FriendsNMe helps friends stay connected but is not an emergency service. Call 911 in an emergency.
+          </p>
+
+          <div class="party-actions">
+            <button id="inviteParty" class="primary-button" type="button">
+              Invite Friends
+            </button>
+            <button id="leavePartyPanel" class="ghost-button" type="button">
+              Leave Party
+            </button>
+            <button id="endPartyPanel" class="share-remove-button" type="button" hidden>
+              End Party
+            </button>
+          </div>
+        </div>
+
+        <div id="leftPartyContent" class="active-party" hidden>
+          <p id="leftPartyText" class="field-hint"></p>
+          <button id="rejoinPartyPanel" class="primary-button" type="button">
+            Rejoin Party
+          </button>
+        </div>
+
+        <p id="partyPanelMessage" class="field-hint" aria-live="polite"></p>
+      </section>
+
+      <section class="sharing-panel friends-panel" aria-labelledby="friendsTitle">
+        <div class="sharing-heading">
+          <p class="eyebrow">Friends</p>
+          <h2 id="friendsTitle">Your friends</h2>
+          <p id="friendsCount" class="field-hint"></p>
+        </div>
+
+        <div id="friendsList" class="shared-accounts friends-list"></div>
+
+        <a class="ghost-button friends-manage" href="sharing.html">Manage sharing</a>
+      </section>
     </aside>
   </main>
+
+  <div
+    id="partyModal"
+    class="party-modal-backdrop"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="partyModalTitle"
+    hidden>
+    <section class="auth-modal party-modal">
+      <div class="modal-heading">
+        <p class="eyebrow">Party Group</p>
+        <h2 id="partyModalTitle">Create Party</h2>
+        <p id="partyModalSubtitle"></p>
+      </div>
+
+      <form id="createPartyForm" class="auth-form" hidden>
+        <label for="partyName">Party name</label>
+        <input id="partyName" type="text" maxlength="80" placeholder="Friday Night" required />
+
+        <label for="destinationName">Destination or event</label>
+        <input id="destinationName" type="text" maxlength="120" placeholder="Pikapp - White Lies" />
+
+        <label for="destinationAddress">Address</label>
+        <input id="destinationAddress" type="text" maxlength="240" placeholder="Optional" />
+
+        <label for="destinationStartTime">Start time</label>
+        <input id="destinationStartTime" type="text" maxlength="40" placeholder="11:00 PM" />
+
+        <div class="destination-grid">
+          <label for="destinationLatitude">
+            Latitude
+            <input id="destinationLatitude" type="text" inputmode="decimal" placeholder="Optional" />
+          </label>
+          <label for="destinationLongitude">
+            Longitude
+            <input id="destinationLongitude" type="text" inputmode="decimal" placeholder="Optional" />
+          </label>
+        </div>
+
+        <label for="destinationUrl">TU Parties URL</label>
+        <input id="destinationUrl" type="url" maxlength="500" placeholder="https://www.tuparties.com/..." />
+
+        <label class="checkbox-line">
+          <input id="destinationIsTuParties" type="checkbox" />
+          Source is TU Parties
+        </label>
+
+        <a class="ghost-button find-tu-link" href="https://www.tuparties.com/" target="_blank" rel="noopener noreferrer">
+          Find on TU Parties
+        </a>
+
+        <label class="checkbox-line">
+          <input id="createShareLocation" type="checkbox" checked />
+          Share my live location with this party until I leave or it ends.
+        </label>
+
+        <button id="createPartySubmit" class="primary-button" type="submit">
+          Create Party
+        </button>
+      </form>
+
+      <form id="joinPartyForm" class="auth-form" hidden>
+        <label for="partyJoinCode">Party code</label>
+        <input id="partyJoinCode" type="text" maxlength="16" placeholder="OWL-4827" required />
+
+        <label class="checkbox-line">
+          <input id="joinShareLocation" type="checkbox" checked />
+          Share my live location with this party until I leave or it ends.
+        </label>
+
+        <p class="field-hint">
+          You will join only after confirming. FriendsNMe never joins you from an invite link automatically.
+        </p>
+
+        <button id="joinPartySubmit" class="primary-button" type="submit">
+          Join Party
+        </button>
+      </form>
+
+      <div class="inline-actions">
+        <button id="partyModalClose" class="link-button" type="button">
+          Cancel
+        </button>
+      </div>
+    </section>
+  </div>
 
   <div
     id="authOverlay"

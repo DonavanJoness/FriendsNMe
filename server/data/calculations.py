@@ -1,4 +1,5 @@
 import math
+import os
 import statistics
 
 
@@ -6,25 +7,55 @@ import statistics
 # SETTINGS
 # ==================================================
 
-# TEMPORARY TEST SETTING
-# Change this back to 3 after testing with two phones.
+PRODUCTION_VALUES = {
+    # Users must be within this distance to count as being together.
+    "CLUSTER_DISTANCE": 30,
+    # Minimum size of the party geofence.
+    "MIN_PARTY_RADIUS": 30,
+    # Distance outside party radius before wandering warning.
+    "WARNING_BUFFER": 25,
+    # Distance outside party radius for stronger alert.
+    "ALERT_BUFFER": 55,
+    # Largest the party geofence can grow to.
+    "MAX_PARTY_RADIUS": 150,
+    # Most GPS error we give someone the benefit of the doubt for.
+    "MAX_ACCURACY_MARGIN": 25,
+}
+
+TEST_VALUES = {
+    # Smaller distances so wandering can be tested by walking a short
+    # way (~30 m instead of ~80 m).
+    "CLUSTER_DISTANCE": 20,
+    "MIN_PARTY_RADIUS": 15,
+    "WARNING_BUFFER": 10,
+    "ALERT_BUFFER": 25,
+    "MAX_PARTY_RADIUS": 80,
+    "MAX_ACCURACY_MARGIN": 10,
+}
+
+SMALL_RADIUS_TESTING = (
+    os.environ.get(
+        "FRIENDSNME_SMALL_RADIUS_TESTING",
+        ""
+    ).lower()
+    == "true"
+)
+
+ACTIVE_VALUES = (
+    TEST_VALUES
+    if SMALL_RADIUS_TESTING
+    else PRODUCTION_VALUES
+)
+
+# Explicit Party Groups can exist with one person, but the geofence
+# math still treats two fresh sharing phones as the minimum group.
 MIN_PARTY_USERS = 2
 
-# Users must be within this distance to count
-# as being together.
-CLUSTER_DISTANCE = 30  # meters
-
-# Minimum size of the party geofence.
-MIN_PARTY_RADIUS = 30  # meters
-
-# Distance outside party radius before wandering warning.
-WARNING_BUFFER = 25  # meters
-
-# Distance outside party radius for stronger alert.
-ALERT_BUFFER = 55  # meters
-
-# Largest the party geofence can grow to.
-MAX_PARTY_RADIUS = 150  # meters
+CLUSTER_DISTANCE = ACTIVE_VALUES["CLUSTER_DISTANCE"]
+MIN_PARTY_RADIUS = ACTIVE_VALUES["MIN_PARTY_RADIUS"]
+WARNING_BUFFER = ACTIVE_VALUES["WARNING_BUFFER"]
+ALERT_BUFFER = ACTIVE_VALUES["ALERT_BUFFER"]
+MAX_PARTY_RADIUS = ACTIVE_VALUES["MAX_PARTY_RADIUS"]
 
 # Radius = RADIUS_SCALE x the median member distance from the
 # center. For people spread evenly over a circle, the median
@@ -32,20 +63,7 @@ MAX_PARTY_RADIUS = 150  # meters
 # edge just outside the crowd.
 RADIUS_SCALE = 1.5
 
-# Most GPS error we give someone the benefit of the doubt for.
-MAX_ACCURACY_MARGIN = 25  # meters
-
-# TEMPORARY TEST SETTING
-# Smaller distances so wandering can be tested by walking a short
-# way (~30 m instead of ~80 m). Set this to False for real parties.
-SMALL_RADIUS_TESTING = True
-
-if SMALL_RADIUS_TESTING:
-    CLUSTER_DISTANCE = 20  # meters
-    MIN_PARTY_RADIUS = 15  # meters
-    WARNING_BUFFER = 10  # meters
-    ALERT_BUFFER = 25  # meters
-    MAX_ACCURACY_MARGIN = 10  # meters
+MAX_ACCURACY_MARGIN = ACTIVE_VALUES["MAX_ACCURACY_MARGIN"]
 
 
 # ==================================================

@@ -14,6 +14,17 @@ def utc_now():
     return datetime.now(timezone.utc)
 
 
+PARTY_STATUS_ACTIVE = "ACTIVE"
+PARTY_STATUS_ENDED = "ENDED"
+
+PARTY_ROLE_HOST = "HOST"
+PARTY_ROLE_MEMBER = "MEMBER"
+
+CHECK_IN_GOOD = "IM_GOOD"
+CHECK_IN_HEADING_HOME = "HEADING_HOME"
+CHECK_IN_NEED_HELP = "NEED_HELP"
+
+
 class User(db.Model):
     __tablename__ = "users"
 
@@ -55,6 +66,103 @@ class LocationShare(db.Model):
     viewer_id = db.Column(db.String, db.ForeignKey("users.id"), nullable=False, index=True)
 
     created_at = db.Column(db.DateTime(timezone=True), default=utc_now)
+
+
+class Party(db.Model):
+    __tablename__ = "parties"
+
+    id = db.Column(db.String, primary_key=True, default=generate_uuid)
+
+    name = db.Column(db.String(80), nullable=False)
+
+    join_code = db.Column(db.String(16), unique=True, nullable=False, index=True)
+
+    host_user_id = db.Column(
+        db.String,
+        db.ForeignKey("users.id"),
+        nullable=False,
+        index=True
+    )
+
+    status = db.Column(
+        db.String(16),
+        nullable=False,
+        default=PARTY_STATUS_ACTIVE,
+        index=True
+    )
+
+    created_at = db.Column(db.DateTime(timezone=True), default=utc_now)
+
+    expires_at = db.Column(db.DateTime(timezone=True), nullable=False, index=True)
+
+    ended_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    destination_name = db.Column(db.String(120), nullable=True)
+
+    destination_address = db.Column(db.String(240), nullable=True)
+
+    destination_latitude = db.Column(db.Float, nullable=True)
+
+    destination_longitude = db.Column(db.Float, nullable=True)
+
+    destination_start_time = db.Column(db.String(40), nullable=True)
+
+    destination_source = db.Column(db.String(40), nullable=True)
+
+    destination_source_url = db.Column(db.String(500), nullable=True)
+
+
+class PartyMember(db.Model):
+    __tablename__ = "party_members"
+    __table_args__ = (
+        db.UniqueConstraint(
+            "party_id",
+            "user_id",
+            name="uq_party_member_user"
+        ),
+    )
+
+    id = db.Column(db.String, primary_key=True, default=generate_uuid)
+
+    party_id = db.Column(
+        db.String,
+        db.ForeignKey("parties.id"),
+        nullable=False,
+        index=True
+    )
+
+    user_id = db.Column(
+        db.String,
+        db.ForeignKey("users.id"),
+        nullable=False,
+        index=True
+    )
+
+    role = db.Column(
+        db.String(16),
+        nullable=False,
+        default=PARTY_ROLE_MEMBER
+    )
+
+    joined_at = db.Column(db.DateTime(timezone=True), default=utc_now)
+
+    left_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    removed_at = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    removed_by_user_id = db.Column(
+        db.String,
+        db.ForeignKey("users.id"),
+        nullable=True
+    )
+
+    location_sharing_enabled = db.Column(db.Boolean, nullable=False, default=False)
+
+    check_in_status = db.Column(
+        db.String(24),
+        nullable=False,
+        default=CHECK_IN_GOOD
+    )
 
 
 class VerificationCode(db.Model):

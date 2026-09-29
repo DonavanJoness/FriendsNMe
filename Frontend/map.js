@@ -12,6 +12,10 @@ const STATUS_INFO = {
   BUFFER_ZONE: { label: "Near the edge of the party", tone: "buffer" },
   WANDERING: { label: "Wandering from the party", tone: "wandering" },
   FAR_FROM_PARTY: { label: "Far from the party", tone: "far" },
+  LOCATION_PAUSED: { label: "Location sharing paused", tone: "none" },
+  NO_LOCATION: { label: "No location yet", tone: "none" },
+  STALE_LOCATION: { label: "Location is stale", tone: "none" },
+  LOW_ACCURACY: { label: "Location accuracy is low", tone: "none" },
   NOT_IN_PARTY: { label: "Not in a party", tone: "none" },
 };
 
@@ -25,6 +29,52 @@ const mapEls = {
   rejoinParty: document.getElementById("rejoinParty"),
   friendsList: document.getElementById("friendsList"),
   friendsCount: document.getElementById("friendsCount"),
+  partyPanelTitle: document.getElementById("partyPanelTitle"),
+  partyPanelDetail: document.getElementById("partyPanelDetail"),
+  noPartyActions: document.getElementById("noPartyActions"),
+  activePartyContent: document.getElementById("activePartyContent"),
+  leftPartyContent: document.getElementById("leftPartyContent"),
+  leftPartyText: document.getElementById("leftPartyText"),
+  partyPanelMessage: document.getElementById("partyPanelMessage"),
+  createPartyOpen: document.getElementById("createPartyOpen"),
+  joinPartyOpen: document.getElementById("joinPartyOpen"),
+  partyCodeText: document.getElementById("partyCodeText"),
+  copyPartyCode: document.getElementById("copyPartyCode"),
+  partyHostText: document.getElementById("partyHostText"),
+  partyMemberCount: document.getElementById("partyMemberCount"),
+  partyTimeLeft: document.getElementById("partyTimeLeft"),
+  partyDestination: document.getElementById("partyDestination"),
+  partyDestinationName: document.getElementById("partyDestinationName"),
+  partyDestinationDetail: document.getElementById("partyDestinationDetail"),
+  partyDestinationDistance: document.getElementById("partyDestinationDistance"),
+  partyDirections: document.getElementById("partyDirections"),
+  partySharingState: document.getElementById("partySharingState"),
+  togglePartySharing: document.getElementById("togglePartySharing"),
+  partyCheckIn: document.getElementById("partyCheckIn"),
+  partyMembersList: document.getElementById("partyMembersList"),
+  inviteParty: document.getElementById("inviteParty"),
+  leavePartyPanel: document.getElementById("leavePartyPanel"),
+  endPartyPanel: document.getElementById("endPartyPanel"),
+  rejoinPartyPanel: document.getElementById("rejoinPartyPanel"),
+  partyModal: document.getElementById("partyModal"),
+  partyModalTitle: document.getElementById("partyModalTitle"),
+  partyModalSubtitle: document.getElementById("partyModalSubtitle"),
+  partyModalClose: document.getElementById("partyModalClose"),
+  createPartyForm: document.getElementById("createPartyForm"),
+  joinPartyForm: document.getElementById("joinPartyForm"),
+  partyName: document.getElementById("partyName"),
+  destinationName: document.getElementById("destinationName"),
+  destinationAddress: document.getElementById("destinationAddress"),
+  destinationStartTime: document.getElementById("destinationStartTime"),
+  destinationLatitude: document.getElementById("destinationLatitude"),
+  destinationLongitude: document.getElementById("destinationLongitude"),
+  destinationUrl: document.getElementById("destinationUrl"),
+  destinationIsTuParties: document.getElementById("destinationIsTuParties"),
+  createShareLocation: document.getElementById("createShareLocation"),
+  createPartySubmit: document.getElementById("createPartySubmit"),
+  partyJoinCode: document.getElementById("partyJoinCode"),
+  joinShareLocation: document.getElementById("joinShareLocation"),
+  joinPartySubmit: document.getElementById("joinPartySubmit"),
 };
 
 // Circle colors come from the --status-* tokens in style.css.
@@ -74,7 +124,10 @@ map.on("load", () => {
   });
 
   mapLoaded = true;
-  if (latestData) renderParty(latestData.me);
+  if (latestData) {
+    renderParty(latestData.me);
+    renderDestination(latestData.party);
+  }
 });
 
 function emptyCollection() {
@@ -109,10 +162,90 @@ function metersBetween(a, b) {
 }
 
 function timeAgo(seconds) {
+  if (seconds === null || seconds === undefined) return "no location yet";
   if (seconds < 60) return "just now";
   if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
   if (seconds < 86400) return `${Math.round(seconds / 3600)} h ago`;
   return `${Math.round(seconds / 86400)} d ago`;
+}
+
+function distanceText(meters) {
+  if (meters === null || meters === undefined) return "";
+  if (meters < 1609.344) return `${Math.round(meters * 3.28084)} ft`;
+  const miles = meters / 1609.344;
+  return `${miles.toFixed(miles < 10 ? 1 : 0)} mi`;
+}
+
+function timeRemaining(seconds) {
+  if (seconds === null || seconds === undefined) return "";
+  if (seconds <= 0) return "Expired";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.round((seconds % 3600) / 60);
+  if (hours <= 0) return `${minutes} min`;
+  if (minutes === 0) return `${hours} h`;
+  return `${hours} h ${minutes} min`;
+}
+
+function memberStatusText(member) {
+  const info = STATUS_INFO[member.status] || STATUS_INFO.NOT_IN_PARTY;
+  if (member.status === "LOCATION_PAUSED") return "location sharing paused";
+  if (member.status === "NO_LOCATION") return "no location yet";
+  if (member.status === "STALE_LOCATION") return `location ${timeAgo(member.ageSeconds)} old`;
+  return `${info.label.toLowerCase()} · updated ${timeAgo(member.ageSeconds)}`;
+}
+
+function destinationMapsUrl(destination) {
+  if (!destination) return "";
+  let target = "";
+  if (destination.latitude !== null && destination.longitude !== null) {
+    target = `${destination.latitude},${destination.longitude}`;
+  } else if (destination.address) {
+    target = destination.address;
+  } else if (destination.name) {
+    target = destination.name;
+  }
+  if (!target) return "";
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(target)}`;
+}
+
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return true;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  let copied = false;
+  try {
+    copied = document.execCommand("copy");
+  } catch {
+    copied = false;
+  }
+
+  textarea.remove();
+  return copied;
+}
+
+function showPartyMessage(text) {
+  mapEls.partyPanelMessage.textContent = text || "";
+}
+
+async function apiDelete(path) {
+  const response = await fetch(path, { method: "DELETE", credentials: "same-origin" });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data.error || `Server returned HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return data;
 }
 
 // ==================================================
@@ -254,8 +387,11 @@ mapEls.locationButton.addEventListener("click", getLocation);
 function render(data) {
   latestData = data;
   renderParty(data.me);
-  renderStatus(data.me);
+  renderDestination(data.party);
+  renderStatus(data);
+  renderPartyPanel(data.party, data.me.leftParty);
   renderFriends(data.friends, data.freshSeconds);
+  renderPartyMemberMarkers(data.party);
   frameOnce(data);
   checkForAlerts(data); // alerts.js
 }
@@ -270,6 +406,19 @@ function frameOnce(data) {
   const points = data.friends
     .filter((friend) => friend.location)
     .map((friend) => [friend.location.longitude, friend.location.latitude]);
+  if (data.party) {
+    data.party.members
+      .filter((member) => member.location)
+      .forEach((member) => points.push([member.location.longitude, member.location.latitude]));
+    const destination = data.party.destination;
+    if (
+      destination &&
+      destination.latitude !== null &&
+      destination.longitude !== null
+    ) {
+      points.push([destination.longitude, destination.latitude]);
+    }
+  }
   if (data.me.party) {
     points.push([data.me.party.center.longitude, data.me.party.center.latitude]);
   }
@@ -293,7 +442,8 @@ function renderParty(me) {
   }
 
   const { center, radius } = party;
-  const color = toneColor(me.party ? STATUS_INFO[me.status].tone : "none");
+  const statusInfo = STATUS_INFO[me.status] || STATUS_INFO.NOT_IN_PARTY;
+  const color = toneColor(me.party ? statusInfo.tone : "none");
 
   source.setData({
     type: "FeatureCollection",
@@ -303,13 +453,55 @@ function renderParty(me) {
   map.setPaintProperty("party-outline", "line-color", color);
 }
 
-function renderStatus(me) {
-  const info = STATUS_INFO[me.status];
+let destinationMarker = null;
+
+function renderDestination(party) {
+  if (!mapLoaded) return;
+
+  const destination = party && party.destination;
+  const hasCoordinates =
+    destination &&
+    destination.latitude !== null &&
+    destination.longitude !== null;
+
+  if (!hasCoordinates) {
+    if (destinationMarker) {
+      destinationMarker.remove();
+      destinationMarker = null;
+    }
+    return;
+  }
+
+  const lngLat = [destination.longitude, destination.latitude];
+  const popupLines = ["Party Destination"];
+  if (destination.name) popupLines.push(destination.name);
+  if (destination.address) popupLines.push(destination.address);
+  if (destination.startTime) popupLines.push(destination.startTime);
+  if (party.myDistanceToDestination !== null) {
+    popupLines.push(`${distanceText(party.myDistanceToDestination)} away`);
+  }
+
+  if (!destinationMarker) {
+    const element = document.createElement("div");
+    element.className = "destination-marker";
+    element.textContent = "D";
+    destinationMarker = new maplibregl.Marker({ element })
+      .setPopup(new maplibregl.Popup({ offset: 18, closeButton: false }))
+      .addTo(map);
+  }
+
+  destinationMarker.setLngLat(lngLat);
+  destinationMarker.getPopup().setText(popupLines.join("\n"));
+}
+
+function renderStatus(data) {
+  const me = data.me;
+  const info = STATUS_INFO[me.status] || STATUS_INFO.NOT_IN_PARTY;
 
   mapEls.partyStatus.hidden = false;
   mapEls.partyStatus.dataset.tone = info.tone;
   mapEls.partyStatusLabel.textContent = info.label;
-  mapEls.leaveParty.hidden = !me.party;
+  mapEls.leaveParty.hidden = !data.party || data.party.myRole === "HOST";
   mapEls.rejoinParty.hidden = !me.leftParty;
 
   if (me.party) {
@@ -321,13 +513,152 @@ function renderStatus(me) {
     mapEls.partyStatusLabel.textContent = "You left the party";
     mapEls.partyStatusDetail.textContent =
       "It's shown in gray on the map. Rejoin any time while it's still going.";
+  } else if (data.party) {
+    mapEls.partyStatusLabel.textContent = "In party group";
+    mapEls.partyStatusDetail.textContent =
+      data.party.mySharing
+        ? "Waiting for a fresh location fix."
+        : "Location sharing is paused for this party.";
   } else if (watchId === null) {
     mapEls.partyStatusDetail.textContent =
-      "Press “Use my location” to find your party.";
+      "Create or join a party, then press Use my location.";
   } else {
     mapEls.partyStatusDetail.textContent =
-      `A party starts when you and someone else are within ${latestData.clusterDistance} m of each other.`;
+      "Create or join a party to share your location with that group.";
   }
+}
+
+function renderPartyPanel(party, leftParty) {
+  showPartyMessage("");
+  mapEls.noPartyActions.hidden = Boolean(party || leftParty);
+  mapEls.activePartyContent.hidden = !party;
+  mapEls.leftPartyContent.hidden = !leftParty || Boolean(party);
+
+  if (!party && !leftParty) {
+    mapEls.partyPanelTitle.textContent = "Start a party";
+    mapEls.partyPanelDetail.textContent =
+      "Create or join a private temporary group before the night starts.";
+    mapEls.partyMembersList.replaceChildren();
+    return;
+  }
+
+  if (leftParty && !party) {
+    mapEls.partyPanelTitle.textContent = "You left the party";
+    mapEls.partyPanelDetail.textContent = leftParty.name;
+    mapEls.leftPartyText.textContent =
+      `${leftParty.name} is still active. Rejoin only if you want this group to see your location again.`;
+    return;
+  }
+
+  mapEls.partyPanelTitle.textContent = party.name;
+  mapEls.partyPanelDetail.textContent =
+    party.destination && party.destination.name
+      ? party.destination.name
+      : "Private temporary party group";
+  mapEls.partyCodeText.textContent = party.joinCode;
+  mapEls.partyHostText.textContent = party.host ? party.host.username : "Unknown";
+  mapEls.partyMemberCount.textContent = `${party.memberCount}`;
+  mapEls.partyTimeLeft.textContent = timeRemaining(party.timeRemainingSeconds);
+  mapEls.partySharingState.textContent = party.mySharing
+    ? "Sharing location"
+    : "Location sharing paused";
+  mapEls.partySharingState.style.color = party.mySharing ? "var(--success)" : "var(--muted)";
+  mapEls.togglePartySharing.textContent = party.mySharing
+    ? "Stop Sharing Location"
+    : "Share Location";
+  mapEls.partyCheckIn.value =
+    party.members.find((member) => member.isSelf)?.checkInStatus || "IM_GOOD";
+  mapEls.endPartyPanel.hidden = party.myRole !== "HOST";
+  mapEls.leavePartyPanel.hidden = party.myRole === "HOST";
+
+  renderPartyDestinationPanel(party);
+  renderPartyMembersList(party);
+}
+
+function renderPartyDestinationPanel(party) {
+  const destination = party.destination;
+  mapEls.partyDestination.hidden = !destination;
+  if (!destination) return;
+
+  mapEls.partyDestinationName.textContent = destination.name || "Party Destination";
+
+  const details = [];
+  if (destination.address) details.push(destination.address);
+  if (destination.startTime) details.push(destination.startTime);
+  if (destination.sourceLabel) details.push(destination.sourceLabel);
+  mapEls.partyDestinationDetail.textContent = details.join(" · ");
+
+  const distances = [];
+  if (party.myDistanceToDestination !== null) {
+    distances.push(`${distanceText(party.myDistanceToDestination)} from you`);
+  }
+  if (party.groupDistanceToDestination !== null) {
+    distances.push(`Group is ${distanceText(party.groupDistanceToDestination)} from destination`);
+  }
+  mapEls.partyDestinationDistance.textContent = distances.join(" · ");
+
+  const directionsUrl = destinationMapsUrl(destination);
+  mapEls.partyDirections.hidden = !directionsUrl;
+  mapEls.partyDirections.onclick = () => {
+    if (directionsUrl) window.open(directionsUrl, "_blank", "noopener,noreferrer");
+  };
+}
+
+function renderPartyMembersList(party) {
+  mapEls.partyMembersList.replaceChildren();
+
+  party.members.forEach((member) => {
+    const statusInfo = STATUS_INFO[member.status] || STATUS_INFO.NOT_IN_PARTY;
+
+    const row = document.createElement("article");
+    row.className = "party-member-row";
+    row.dataset.tone = statusInfo.tone;
+    row.dataset.help = member.checkInStatus === "NEED_HELP" ? "true" : "false";
+
+    const avatar = document.createElement("span");
+    avatar.className = "friend-avatar";
+    avatar.textContent = member.username.charAt(0).toUpperCase();
+
+    const text = document.createElement("div");
+    text.className = "party-member-text";
+
+    const name = document.createElement("strong");
+    name.textContent = `${member.username}${member.isSelf ? " (you)" : ""}`;
+
+    const status = document.createElement("span");
+    status.textContent = `${member.checkInLabel} · ${memberStatusText(member)}`;
+
+    text.append(name, status);
+
+    const actions = document.createElement("div");
+    actions.className = "party-member-actions";
+
+    if (member.location) {
+      const viewButton = document.createElement("button");
+      viewButton.className = "share-add-button";
+      viewButton.type = "button";
+      viewButton.textContent = "View";
+      viewButton.addEventListener("click", () => {
+        map.flyTo({
+          center: [member.location.longitude, member.location.latitude],
+          zoom: 17,
+        });
+      });
+      actions.appendChild(viewButton);
+    }
+
+    if (member.canRemove) {
+      const removeButton = document.createElement("button");
+      removeButton.className = "share-remove-button";
+      removeButton.type = "button";
+      removeButton.textContent = "Remove";
+      removeButton.addEventListener("click", () => removePartyMember(member, removeButton));
+      actions.appendChild(removeButton);
+    }
+
+    row.append(avatar, text, actions);
+    mapEls.partyMembersList.appendChild(row);
+  });
 }
 
 function friendDetail(friend, freshSeconds) {
@@ -337,15 +668,18 @@ function friendDetail(friend, freshSeconds) {
   if (friend.ageSeconds > freshSeconds) return `Last seen ${ago}`;
   if (friend.status === "NOT_IN_PARTY") return `Not in a party · ${ago}`;
   if (!friend.sameParty) return `At another party · ${ago}`;
-  return `${STATUS_INFO[friend.status].label} · ${ago}`;
+  const info = STATUS_INFO[friend.status] || STATUS_INFO.NOT_IN_PARTY;
+  return `${info.label} · ${ago}`;
 }
 
 function friendTone(friend, freshSeconds) {
   if (!friend.location || friend.ageSeconds > freshSeconds) return "none";
-  return STATUS_INFO[friend.status].tone;
+  const info = STATUS_INFO[friend.status] || STATUS_INFO.NOT_IN_PARTY;
+  return info.tone;
 }
 
 const friendMarkers = new Map();
+const partyMarkers = new Map();
 
 function renderFriends(friends, freshSeconds) {
   mapEls.friendsCount.textContent = friends.length === 1
@@ -396,7 +730,7 @@ function renderFriends(friends, freshSeconds) {
     row.appendChild(info);
     mapEls.friendsList.appendChild(row);
 
-    if (!friend.location) return;
+    if (!friend.location || friend.sameParty) return;
 
     const lngLat = [friend.location.longitude, friend.location.latitude];
     row.addEventListener("click", () => {
@@ -437,25 +771,261 @@ function renderFriends(friends, freshSeconds) {
   }
 }
 
-// Leave / Rejoin: POST, then redraw with the server's answer.
-function partyButton(button, path) {
-  button.addEventListener("click", () => {
-    button.disabled = true;
-    api(path, {})
-      .then(render)
-      .catch((partyError) => {
-        mapEls.locationText.textContent = partyError.message;
-        // e.g. the party ended; refresh so the button goes away.
-        refresh();
-      })
-      .finally(() => {
-        button.disabled = false;
-      });
+function renderPartyMemberMarkers(party) {
+  const seen = new Set();
+
+  if (party) {
+    party.members.forEach((member) => {
+      if (member.isSelf || !member.location) return;
+
+      const statusInfo = STATUS_INFO[member.status] || STATUS_INFO.NOT_IN_PARTY;
+      const lngLat = [member.location.longitude, member.location.latitude];
+      seen.add(member.id);
+
+      let marker = partyMarkers.get(member.id);
+      if (!marker) {
+        const element = document.createElement("div");
+        element.className = "friend-marker";
+        element.textContent = member.username.charAt(0).toUpperCase();
+
+        marker = new maplibregl.Marker({ element })
+          .setLngLat(lngLat)
+          .setPopup(new maplibregl.Popup({ offset: 18, closeButton: false }))
+          .addTo(map);
+        partyMarkers.set(member.id, marker);
+      }
+
+      const detail = `${member.checkInLabel} · ${memberStatusText(member)}`;
+      const element = marker.getElement();
+      element.dataset.tone = statusInfo.tone;
+      element.classList.toggle("is-stale", member.status === "STALE_LOCATION");
+      element.setAttribute("aria-label", `${member.username}: ${detail}`);
+      marker.setLngLat(lngLat);
+      marker.getPopup().setText(`${member.username} · ${detail}`);
+    });
+  }
+
+  for (const [id, marker] of partyMarkers) {
+    if (!seen.has(id)) {
+      marker.remove();
+      partyMarkers.delete(id);
+    }
+  }
+}
+
+async function runPartyAction(button, task) {
+  button.disabled = true;
+  try {
+    await task();
+    await refresh();
+  } catch (partyError) {
+    await refresh().catch(() => {});
+    showPartyMessage(partyError.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function currentPartyId() {
+  return latestData && latestData.party ? latestData.party.id : null;
+}
+
+function leftPartyId() {
+  return latestData && latestData.me.leftParty ? latestData.me.leftParty.id : null;
+}
+
+function leaveCurrentParty(button) {
+  const partyId = currentPartyId();
+  if (!partyId) return;
+  if (!window.confirm("Leave this party? Your location will stop being shared with the group.")) return;
+
+  runPartyAction(button, async () => {
+    await api(`/api/parties/${encodeURIComponent(partyId)}/leave`, {});
   });
 }
 
-partyButton(mapEls.leaveParty, "/api/party/leave");
-partyButton(mapEls.rejoinParty, "/api/party/rejoin");
+function rejoinLeftParty(button) {
+  const partyId = leftPartyId();
+  if (!partyId) return;
+  if (!window.confirm("Rejoin this party and share your location if enabled?")) return;
+
+  runPartyAction(button, async () => {
+    await api(`/api/parties/${encodeURIComponent(partyId)}/rejoin`, {
+      shareLocation: true,
+    });
+  });
+}
+
+function endCurrentParty() {
+  const partyId = currentPartyId();
+  if (!partyId) return;
+  if (!window.confirm("End this party for everyone? Location sharing and wandering alerts will stop.")) return;
+
+  runPartyAction(mapEls.endPartyPanel, async () => {
+    await api(`/api/parties/${encodeURIComponent(partyId)}/end`, {});
+  });
+}
+
+function removePartyMember(member, button) {
+  const partyId = currentPartyId();
+  if (!partyId) return;
+  if (!window.confirm(`Remove ${member.username} from this party?`)) return;
+
+  runPartyAction(button, async () => {
+    await apiDelete(
+      `/api/parties/${encodeURIComponent(partyId)}/members/${encodeURIComponent(member.id)}`
+    );
+  });
+}
+
+mapEls.leaveParty.addEventListener("click", () => leaveCurrentParty(mapEls.leaveParty));
+mapEls.leavePartyPanel.addEventListener("click", () => leaveCurrentParty(mapEls.leavePartyPanel));
+mapEls.rejoinParty.addEventListener("click", () => rejoinLeftParty(mapEls.rejoinParty));
+mapEls.rejoinPartyPanel.addEventListener("click", () => rejoinLeftParty(mapEls.rejoinPartyPanel));
+mapEls.endPartyPanel.addEventListener("click", endCurrentParty);
+
+// ==================================================
+// CREATE / JOIN PARTY UI
+// ==================================================
+
+const inviteCodeFromUrl = new URLSearchParams(window.location.search).get("code");
+let invitePrompted = false;
+
+function openPartyModal(mode, code = "") {
+  const creating = mode === "create";
+  mapEls.partyModal.hidden = false;
+  mapEls.createPartyForm.hidden = !creating;
+  mapEls.joinPartyForm.hidden = creating;
+  mapEls.partyModalTitle.textContent = creating ? "Create Party" : "Join Party";
+  mapEls.partyModalSubtitle.textContent = creating
+    ? "Name the party, optionally add a destination, and choose whether to share your location."
+    : "Confirm the code and choose whether this party can see your live location.";
+
+  if (creating) {
+    mapEls.partyName.focus();
+  } else {
+    mapEls.partyJoinCode.value = code;
+    mapEls.partyJoinCode.focus();
+  }
+}
+
+function closePartyModal() {
+  mapEls.partyModal.hidden = true;
+  mapEls.createPartyForm.reset();
+  mapEls.joinPartyForm.reset();
+  mapEls.createShareLocation.checked = true;
+  mapEls.joinShareLocation.checked = true;
+}
+
+function optionalValue(input) {
+  const value = input.value.trim();
+  return value || null;
+}
+
+function destinationBody() {
+  const destination = {
+    name: optionalValue(mapEls.destinationName),
+    address: optionalValue(mapEls.destinationAddress),
+    startTime: optionalValue(mapEls.destinationStartTime),
+    latitude: optionalValue(mapEls.destinationLatitude),
+    longitude: optionalValue(mapEls.destinationLongitude),
+    source: mapEls.destinationIsTuParties.checked ? "tuparties" : "manual",
+    sourceUrl: optionalValue(mapEls.destinationUrl),
+  };
+
+  const hasDestination = Object.entries(destination).some(([key, value]) => {
+    if (key === "source") return false;
+    return value !== null;
+  });
+
+  return hasDestination ? destination : null;
+}
+
+mapEls.createPartyOpen.addEventListener("click", () => openPartyModal("create"));
+mapEls.joinPartyOpen.addEventListener("click", () => openPartyModal("join"));
+mapEls.partyModalClose.addEventListener("click", closePartyModal);
+mapEls.partyModal.addEventListener("click", (event) => {
+  if (event.target === mapEls.partyModal) closePartyModal();
+});
+
+mapEls.createPartyForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+
+  runPartyAction(mapEls.createPartySubmit, async () => {
+    await api("/api/parties", {
+      name: mapEls.partyName.value.trim(),
+      destination: destinationBody(),
+      shareLocation: mapEls.createShareLocation.checked,
+    });
+    closePartyModal();
+  });
+});
+
+mapEls.joinPartyForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+
+  runPartyAction(mapEls.joinPartySubmit, async () => {
+    await api("/api/parties/join", {
+      code: mapEls.partyJoinCode.value.trim(),
+      shareLocation: mapEls.joinShareLocation.checked,
+    });
+    closePartyModal();
+    window.history.replaceState({}, "", window.location.pathname);
+  });
+});
+
+mapEls.copyPartyCode.addEventListener("click", async () => {
+  const party = latestData && latestData.party;
+  if (!party) return;
+  const copied = await copyText(`${party.joinCode}\n${party.inviteUrl}`);
+  showPartyMessage(copied ? "Party code copied." : `Code: ${party.joinCode}`);
+});
+
+mapEls.inviteParty.addEventListener("click", async () => {
+  const party = latestData && latestData.party;
+  if (!party) return;
+
+  const text = `Join ${party.name} on FriendsNMe with code ${party.joinCode}.`;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: "FriendsNMe party invite",
+        text,
+        url: party.inviteUrl,
+      });
+      return;
+    } catch {
+      /* fall back to clipboard */
+    }
+  }
+
+  const copied = await copyText(`${text}\n${party.inviteUrl}`);
+  showPartyMessage(copied ? "Invite copied." : `${party.joinCode} · ${party.inviteUrl}`);
+});
+
+mapEls.togglePartySharing.addEventListener("click", () => {
+  const party = latestData && latestData.party;
+  if (!party) return;
+
+  const enabled = !party.mySharing;
+  runPartyAction(mapEls.togglePartySharing, async () => {
+    await api(`/api/parties/${encodeURIComponent(party.id)}/location-sharing`, {
+      enabled,
+    });
+  });
+});
+
+mapEls.partyCheckIn.addEventListener("change", () => {
+  const party = latestData && latestData.party;
+  if (!party) return;
+
+  runPartyAction(mapEls.partyCheckIn, async () => {
+    await api(`/api/parties/${encodeURIComponent(party.id)}/status`, {
+      status: mapEls.partyCheckIn.value,
+    });
+  });
+});
 
 // ==================================================
 // SIGN IN / SIGN OUT (events come from index.js)
@@ -464,18 +1034,24 @@ partyButton(mapEls.rejoinParty, "/api/party/rejoin");
 let pollTimer = null;
 
 function refresh() {
-  api("/api/map")
+  return api("/api/map")
     .then(render)
     .catch((refreshError) => {
       // Signed out elsewhere; index.js handles showing the login.
       if (refreshError.status === 401) stopPolling();
+      throw refreshError;
     });
 }
 
 function startPolling() {
   if (pollTimer !== null) return;
-  refresh();
-  pollTimer = setInterval(refresh, POLL_INTERVAL_MS);
+  refresh().catch(() => {});
+  pollTimer = setInterval(() => refresh().catch(() => {}), POLL_INTERVAL_MS);
+
+  if (inviteCodeFromUrl && !invitePrompted) {
+    invitePrompted = true;
+    openPartyModal("join", inviteCodeFromUrl.toUpperCase());
+  }
 }
 
 function stopPolling() {
@@ -496,7 +1072,15 @@ document.addEventListener("friendsnme:signed-out", () => {
   userMarkerAdded = false;
   friendMarkers.forEach((marker) => marker.remove());
   friendMarkers.clear();
+  partyMarkers.forEach((marker) => marker.remove());
+  partyMarkers.clear();
+  if (destinationMarker) {
+    destinationMarker.remove();
+    destinationMarker = null;
+  }
   renderParty(null);
+  renderPartyPanel(null, null);
+  closePartyModal();
   mapEls.partyStatus.hidden = true;
   mapEls.friendsList.replaceChildren();
   mapEls.friendsCount.textContent = "";
