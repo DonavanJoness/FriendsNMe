@@ -23,7 +23,8 @@ Permanent friend sharing still exists on the Sharing page. Joining a party does 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
+SESSION_SECRET=dev-secret flask --app server/data/app.py db upgrade
 AUTH_LOG_VERIFICATION_CODES=true FRIENDSNME_DEBUG=true python server/data/app.py
 ```
 
@@ -39,6 +40,9 @@ Windows PowerShell:
 
 ```powershell
 .venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+$env:SESSION_SECRET="dev-secret"
+flask --app server/data/app.py db upgrade
 $env:AUTH_LOG_VERIFICATION_CODES="true"
 $env:FRIENDSNME_DEBUG="true"
 python server/data/app.py
@@ -46,11 +50,79 @@ python server/data/app.py
 
 ## Environment Variables
 
-- `SESSION_SECRET`: signs login cookies. Set this for any shared testing. If unset, the server creates a random secret and everyone is signed out on restart.
-- `FRIENDSNME_DATABASE_URI`: optional SQLAlchemy database URI. Defaults to `server/data/friendsnme.db`.
+- `SESSION_SECRET`: signs login cookies. Required in production. Local dev gets a temporary secret if unset, but using a fixed dev value avoids surprise sign-outs.
+- `DATABASE_URL`: production database URL. Railway PostgreSQL provides this automatically.
+- `FRIENDSNME_DATABASE_URI`: optional local/test SQLAlchemy database URI. Defaults to `server/data/friendsnme.db` when `DATABASE_URL` is not set.
+- `FRIENDSNME_ENV=production` or `FLASK_ENV=production`: enables production config outside Railway. Railway is detected automatically through `RAILWAY_ENVIRONMENT`.
 - `FRIENDSNME_DEBUG=true`: enables Flask debug mode, debug user logs, and `/api/debug/users`. Do not use this on a public or shared network.
-- `AUTH_LOG_VERIFICATION_CODES=true`: prints verification codes in the terminal instead of emailing them.
-- `SMTP_HOST`, `SMTP_FROM`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`: optional SMTP settings for real email delivery.
+- `AUTH_LOG_VERIFICATION_CODES=true`: prints verification codes in development only. It is ignored in production.
+- `FRIENDSNME_REQUIRE_EMAIL_DELIVERY=true`: in development, require SMTP email delivery instead of falling back to terminal verification codes.
+- `SMTP_HOST`, `SMTP_FROM`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`: required in production for real email delivery.
+
+Production requires:
+
+```text
+SESSION_SECRET
+DATABASE_URL
+SMTP_HOST
+SMTP_PORT
+SMTP_FROM
+SMTP_USER
+SMTP_PASS
+SMTP_SECURE
+```
+
+Keep these off in production:
+
+```text
+FRIENDSNME_DEBUG
+AUTH_LOG_VERIFICATION_CODES
+```
+
+## Sending Verification Codes by Email
+
+For local testing with real email delivery:
+
+1. Copy `.env.example` to `.env`.
+2. Fill in real SMTP settings from your email provider.
+3. Set `FRIENDSNME_REQUIRE_EMAIL_DELIVERY=true`.
+4. Make sure `AUTH_LOG_VERIFICATION_CODES` is not set.
+5. Restart Flask.
+
+Example `.env` values:
+
+```text
+SESSION_SECRET=<your local secret>
+FRIENDSNME_REQUIRE_EMAIL_DELIVERY=true
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_FROM=FriendsNMe <no-reply@example.com>
+SMTP_USER=<smtp username>
+SMTP_PASS=<smtp password>
+SMTP_SECURE=false
+```
+
+Use `SMTP_SECURE=false` for SMTP with STARTTLS on port `587`. Use `SMTP_SECURE=true` for SMTP-over-SSL on port `465`.
+
+Production always requires SMTP and never prints verification codes to the console.
+
+## Database Migrations
+
+FriendsNMe uses Flask-Migrate/Alembic. Do not rely on automatic `db.create_all()` for production.
+
+Fresh local database:
+
+```bash
+SESSION_SECRET=dev-secret flask --app server/data/app.py db upgrade
+```
+
+Production/Railway database:
+
+```bash
+flask --app server/data/app.py db upgrade
+```
+
+If you already have a local SQLite database from before migrations, back it up first. If the schema already matches the initial migration, use `flask --app server/data/app.py db stamp head`; otherwise create a fresh local DB or write a one-off migration for that database.
 
 ## Testing With Multiple Phones
 
@@ -58,6 +130,7 @@ Phone browsers require HTTPS for location access unless the site is on `localhos
 
 ```bash
 source .venv/bin/activate
+SESSION_SECRET=<your generated secret> flask --app server/data/app.py db upgrade
 AUTH_LOG_VERIFICATION_CODES=true SESSION_SECRET=<your generated secret> python server/data/app.py
 cloudflared tunnel --url http://localhost:5000
 ```
@@ -68,10 +141,72 @@ Open the `https://...trycloudflare.com` URL on each phone. Create separate accou
 
 ```bash
 source .venv/bin/activate
+pip install -r requirements-dev.txt
 pytest
 ```
 
 The tests use an isolated SQLite database path configured through `FRIENDSNME_DATABASE_URI`.
+
+## Deploying FriendsNMe to Railway
+
+FriendsNMe deploys as one Flask app that serves both the frontend and API from the same Railway domain.
+
+1. Create a Railway project.
+2. Connect the GitHub repository.
+3. Add a Railway PostgreSQL service to the project.
+4. Confirm the web service has `DATABASE_URL` from the PostgreSQL service.
+5. Add production environment variables:
+
+```text
+SESSION_SECRET=<generate a long random value>
+SMTP_HOST=<your SMTP host>
+SMTP_PORT=587
+SMTP_FROM=<verified sender address>
+SMTP_USER=<SMTP username>
+SMTP_PASS=<SMTP password>
+SMTP_SECURE=false
+```
+
+6. Make sure these are not set in production:
+
+```text
+FRIENDSNME_DEBUG
+AUTH_LOG_VERIFICATION_CODES
+```
+
+7. Use the Railway start command from `railway.json`:
+
+```bash
+gunicorn --chdir server/data --bind 0.0.0.0:$PORT app:app
+```
+
+8. Run the migration command in a Railway shell or one-off command:
+
+```bash
+flask --app server/data/app.py db upgrade
+```
+
+9. Generate the Railway public domain.
+10. Open `/api/health`; it should return:
+
+```json
+{
+  "status": "ok",
+  "database": "ok"
+}
+```
+
+11. Test Temple email verification using a real `@temple.edu` address.
+12. Create a party on one account.
+13. Join the party from a second account using the invite URL or code.
+14. Test location sharing with two phones over the Railway HTTPS URL.
+
+Railway rollback:
+
+1. Open the Railway service deployments.
+2. Select the last known good deployment.
+3. Choose Redeploy/Rollback for that deployment.
+4. If a database migration caused the issue, deploy code compatible with the current schema or run the matching Alembic downgrade only after confirming it will not destroy needed data.
 
 ## Party API
 

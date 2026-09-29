@@ -3,6 +3,7 @@
 venv/
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Local data: user emails, locations and sessions. Never commit these.
 *.db
@@ -11,3 +12,5 @@ server/data/auth-db.json
 
 # Secrets
 .env
+.env.*
+!.env.example

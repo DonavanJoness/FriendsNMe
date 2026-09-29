@@ -12,6 +12,8 @@ from datetime import timedelta, timezone, datetime
 from email.message import EmailMessage
 
 from flask import Flask, request, jsonify, send_from_directory, session
+from flask_migrate import Migrate
+from sqlalchemy import text
 
 from models import (
     db,
@@ -45,6 +47,39 @@ from event_sources import normalize_destination
 # ==================================================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.abspath(
+    os.path.join(BASE_DIR, "..", "..")
+)
+
+
+def load_local_env_file():
+
+    env_path = os.path.join(PROJECT_DIR, ".env")
+
+    if not os.path.exists(env_path):
+        return
+
+    with open(env_path, encoding="utf-8") as env_file:
+
+        for line in env_file:
+
+            stripped = line.strip()
+
+            if (
+                not stripped
+                or stripped.startswith("#")
+                or "=" not in stripped
+            ):
+                continue
+
+            key, value = stripped.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+
+            os.environ.setdefault(key, value)
+
+
+load_local_env_file()
 
 # Windows can map .js to text/plain in the registry, and browsers
 # refuse to run a service worker (sw.js) served that way.
@@ -61,18 +96,55 @@ FRONTEND_DIR = os.path.abspath(
 
 app = Flask(__name__)
 
+def env_flag(name):
+
+    return os.environ.get(name, "").lower() == "true"
+
+
+def running_in_production():
+
+    return (
+        os.environ.get("FLASK_ENV") == "production"
+        or os.environ.get("FRIENDSNME_ENV") == "production"
+        or bool(os.environ.get("RAILWAY_ENVIRONMENT"))
+    )
+
+
+PRODUCTION_MODE = running_in_production()
+
 # Debug mode turns on the Werkzeug debugger and /api/debug/users.
 # Only enable it on your own machine: FRIENDSNME_DEBUG=true
-DEBUG_MODE = (
-    os.environ.get("FRIENDSNME_DEBUG", "").lower()
-    == "true"
-)
+DEBUG_MODE = env_flag("FRIENDSNME_DEBUG") and not PRODUCTION_MODE
 
 # The secret signs login cookies. A hard-coded fallback would let
-# anyone who has read this file forge a session, so when
-# SESSION_SECRET is unset we use a random one instead. Sessions
-# then reset whenever the server restarts.
+# anyone who has read this file forge a session. In production this
+# must be configured; local dev gets a temporary one for convenience.
 app.secret_key = os.environ.get("SESSION_SECRET")
+
+PRODUCTION_REQUIRED_ENV = [
+    "SESSION_SECRET",
+    "DATABASE_URL",
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_FROM",
+    "SMTP_USER",
+    "SMTP_PASS",
+    "SMTP_SECURE",
+]
+
+if PRODUCTION_MODE:
+
+    missing = [
+        name
+        for name in PRODUCTION_REQUIRED_ENV
+        if not os.environ.get(name)
+    ]
+
+    if missing:
+        raise RuntimeError(
+            "Missing required production environment variables: "
+            + ", ".join(missing)
+        )
 
 if not app.secret_key:
 
@@ -85,14 +157,17 @@ if not app.secret_key:
     )
 
 app.permanent_session_lifetime = timedelta(days=30)
+app.config["SESSION_COOKIE_SECURE"] = PRODUCTION_MODE
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 
 # ==================================================
 # PARTY STATE
 # ==================================================
 
-# Lives in server memory (see party.py), so restarting
-# app.py clears all parties.
+# Only geofence snapshots live in server memory. Party and
+# membership records are database-backed and survive restarts.
 party_tracker = PartyTracker()
 
 
@@ -102,40 +177,58 @@ party_tracker = PartyTracker()
 
 DATABASE_PATH = os.path.join(BASE_DIR, "friendsnme.db")
 
-DATABASE_URI = os.environ.get(
-    "FRIENDSNME_DATABASE_URI",
-    f"sqlite:///{DATABASE_PATH}"
-)
+def database_uri():
+
+    configured_url = (
+        os.environ.get("DATABASE_URL")
+        or os.environ.get("FRIENDSNME_DATABASE_URI")
+    )
+
+    if configured_url:
+
+        # Some platforms expose postgres://, while SQLAlchemy 2
+        # expects postgresql://.
+        if configured_url.startswith("postgres://"):
+            configured_url = (
+                "postgresql://"
+                + configured_url[len("postgres://"):]
+            )
+
+        return configured_url
+
+    return f"sqlite:///{DATABASE_PATH}"
+
+
+DATABASE_URI = database_uri()
+
+
+def database_log_label(uri):
+
+    if uri.startswith("sqlite:///"):
+        return uri
+
+    if "://" not in uri:
+        return "configured"
+
+    scheme, rest = uri.split("://", 1)
+    host_part = rest.split("@", 1)[-1]
+
+    return f"{scheme}://{host_part}"
 
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URI
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
+migrate = Migrate(app, db, compare_type=True)
 
-with app.app_context():
+print("\n================================")
+print("DATABASE CONFIGURED")
+print("================================")
 
-    db.create_all()
+print("Database:", database_log_label(DATABASE_URI))
 
-    print("\n================================")
-    print("DATABASE STARTED")
-    print("================================")
-
-    print("Database:", DATABASE_URI)
-
-    users = User.query.all()
-
-    print("Users currently stored:", len(users))
-
-    # Emails and locations only go to the log in debug mode.
-    for user in (users if DEBUG_MODE else []):
-
-        print(
-            "USER:",
-            user.id,
-            user.username,
-            user.email,
-            user.last_location
-        )
+if PRODUCTION_MODE:
+    print("Production mode: migrations must be run with flask db upgrade.")
 
 
 # ==================================================
@@ -482,16 +575,15 @@ def require_party_host(party_id):
 
 def send_verification_email(email, code):
 
-    should_log = (
-        os.environ.get(
-            "AUTH_LOG_VERIFICATION_CODES",
-            ""
-        ).lower() == "true"
+    require_email_delivery = (
+        PRODUCTION_MODE
+        or env_flag("FRIENDSNME_REQUIRE_EMAIL_DELIVERY")
     )
 
-    is_production = (
-        os.environ.get("FLASK_ENV")
-        == "production"
+    should_log = (
+        env_flag("AUTH_LOG_VERIFICATION_CODES")
+        and not PRODUCTION_MODE
+        and not require_email_delivery
     )
 
     # During development, print verification code
@@ -499,7 +591,7 @@ def send_verification_email(email, code):
     if (
         should_log
         or (
-            not is_production
+            not require_email_delivery
             and not os.environ.get("SMTP_HOST")
         )
     ):
@@ -517,7 +609,7 @@ def send_verification_email(email, code):
     if not smtp_host or not smtp_from:
 
         raise RuntimeError(
-            "Email delivery is not configured."
+            "Email delivery is not configured. Set SMTP_HOST and SMTP_FROM."
         )
 
     smtp_port = int(
@@ -617,6 +709,28 @@ def join_page():
         FRONTEND_DIR,
         "index.html"
     )
+
+
+# ==================================================
+# HEALTH CHECK
+# ==================================================
+
+@app.get("/api/health")
+def health_check():
+
+    try:
+        db.session.execute(text("SELECT 1"))
+    except Exception:
+        db.session.rollback()
+        return jsonify({
+            "status": "error",
+            "database": "unavailable"
+        }), 503
+
+    return jsonify({
+        "status": "ok",
+        "database": "ok"
+    })
 
 
 # ==================================================
@@ -920,13 +1034,15 @@ def complete_signup():
     db.session.add(user)
     db.session.commit()
 
-    print("\n================================")
-    print("NEW USER SAVED TO DATABASE")
-    print("================================")
+    if DEBUG_MODE:
 
-    print("ID:", user.id)
-    print("USERNAME:", user.username)
-    print("EMAIL:", user.email)
+        print("\n================================")
+        print("NEW USER SAVED TO DATABASE")
+        print("================================")
+
+        print("ID:", user.id)
+        print("USERNAME:", user.username)
+        print("EMAIL:", user.email)
 
     session.permanent = True
     session["user_id"] = user.id
@@ -2396,6 +2512,6 @@ if __name__ == "__main__":
 
     app.run(
         host="0.0.0.0",
-        port=5000,
-        debug=DEBUG_MODE
+        port=int(os.environ.get("PORT", "5000")),
+        debug=DEBUG_MODE and not PRODUCTION_MODE
     )
